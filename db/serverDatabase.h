@@ -5,12 +5,17 @@
 
 #include "SessionList.h"
 
+enum 
+{
+			STR_BUF_SIZE			=			100
+};
+
 typedef struct
 {
 	int ls;
 	int db_records_num;
-	char userinfo_table_name[100];
-	char usersessions_table_name[100];
+	char userinfo_table_name[STR_BUF_SIZE];
+	char usersessions_table_name[STR_BUF_SIZE];
 	Session* sess_list;
 } Server;
 

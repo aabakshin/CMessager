@@ -20,28 +20,43 @@ int db_get_new_record_index(const char* table_name)
 
 	if ( (table_name == NULL) || (table_name[0] == '\0') )
 	{
-		fprintf(stderr, "[%s] %s In function \"db_userinfo_table_get_size\" incorrect \"table_name\" argument!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s In function \"db_get_new_record_index\" incorrect \"table_name\" argument!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
 	
 	FILE* fd;
 	if ( (fd = fopen(table_name, "rb")) == NULL )
 	{
-		fprintf(stderr, "[%s] %s In function \"db_userinfo_table_get_size\" file \"%s\" does not exist!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, table_name);
+		fprintf(stderr, "[%s] %s In function \"db_get_new_record_index\" file \"%s\" does not exist!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, table_name);
 		return -1;
 	}
-
-	DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
+	
 	int index = 0;
+	DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
+	if ( !record )
+	{
+		fclose(fd);
+		fprintf(stderr, "[%s] %s In function \"db_get_new_record_index\" unable to allocate memory to \"record\" pointer!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+		return -1;
+	}
 
 	while ( !feof(fd) )
 	{
 		fread(record, sizeof(DBUsersInformation), 1, fd);
 		if ( record->ID == -1 )
+		{
+			free(record);
+			fclose(fd);
 			return index; 
+		}
 
 		index++;		
 	}
+
+	if ( record )
+		free(record);
+	
+	fclose(fd);
 
 	return -1;
 }
@@ -64,6 +79,13 @@ int db_userinfo_table_get_size(const char* table_name)
 	}
 
 	DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
+	if ( !record )
+	{
+		fclose(fd);
+		fprintf(stderr, "[%s] %s In function \"db_userinfo_table_get_size\" unable to allocate memory to \"record\" pointer!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+		return -1;
+	}
+
 	int records_num = 0;
 
 	while ( !feof(fd) )
@@ -102,6 +124,13 @@ int db_userinfo_table_is_empty(const char* table_name)
 		}
 
 		DBUsersInformation* first_record = malloc(sizeof(DBUsersInformation));
+		if ( !first_record )
+		{
+			fclose(fd);
+			fprintf(stderr, "[%s] %s In function \"db_userinfo_table_is_empty\" unable to allocate memory to \"first_record\" pointer!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+			return 0;
+		}
+
 		int non_empty_record = 0;
 
 		while ( !feof(fd) )
@@ -151,6 +180,12 @@ int db_userinfo_table_is_full(const char* table_name)
 		}
 
 		DBUsersInformation* first_record = malloc(sizeof(DBUsersInformation));
+		if ( !first_record )
+		{
+			fclose(fd);
+			fprintf(stderr, "[%s] %s In function \"db_userinfo_table_is_full\" unable to allocate memory to \"first_record\" pointer!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+			return 0;
+		}
 		int empty_record = 0;
 
 		while ( !feof(fd) )
@@ -224,6 +259,7 @@ int db_create_userinfo_table(int records_num, const char* table_name)
 	DBUsersInformation* new_record = malloc( sizeof(DBUsersInformation) );
 	if ( !new_record )
 	{
+		fclose(fd);
 		fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" memory error\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
@@ -275,6 +311,12 @@ int db_usersessions_table_get_size(const char* table_name)
 	}
 
 	DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
+	if ( !record )
+	{
+		fclose(fd);
+		fprintf(stderr, "[%s] %s In function \"db_usersessions_table_get_size\" unable to allocate memory to \"record\" pointer!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+		return -1;
+	}
 	int records_num = 0;
 
 	while ( !feof(fd) )
@@ -313,6 +355,12 @@ int db_usersessions_table_is_empty(const char* table_name)
 		}
 
 		DBUsersInformation* first_record = malloc(sizeof(DBUsersInformation));
+		if ( !first_record )
+		{
+			fclose(fd);
+			fprintf(stderr, "[%s] %s In function \"db_usersessions_table_is_empty\" unable to allocate memory to \"first_record\" pointer!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+			return 0;
+		}
 		int non_empty_record = 0;
 
 		while ( !feof(fd) )
@@ -362,6 +410,12 @@ int db_usersessions_table_is_full(const char* table_name)
 		}
 
 		DBXUsersInformation* first_record = malloc(sizeof(DBXUsersInformation));
+		if ( !first_record )
+		{
+			fclose(fd);
+			fprintf(stderr, "[%s] %s In function \"db_usersessions_table_is_full\" unable to allocate memory to \"first_record\" pointer!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+			return 0;
+		}
 		int empty_record = 0;
 
 		while ( !feof(fd) )
@@ -436,6 +490,7 @@ int db_create_usersessions_table(int records_num, const char* table_name)
 	DBXUsersInformation* new_record = malloc(sizeof(DBXUsersInformation));
 	if ( !new_record )
 	{
+		fclose(fd);
 		fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" memory error\n", get_time_str(cur_time,MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
@@ -501,6 +556,7 @@ int db_get_record_index_by_name(const char* nickname, const char* userinfo_table
 	DBUsersInformation* record = malloc( sizeof(DBUsersInformation) );
 	if ( !record )
 	{
+		fclose(fd);
 		fprintf(stderr, "[%s] %s In function \"get_record_index_by_name\" memory error with \"record\"\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
@@ -560,13 +616,6 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 		return NULL;
 	}
 
-	char* result = malloc(sizeof(char) * BUFFER_SIZE);
-	if ( !result )
-	{
-		fprintf(stderr, "[%s] %s In function \"db_readline_from_tables\" memory error with \"result\"!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
-		return NULL;
-	}
-
 	FILE* fd = NULL;
 	if ( !(fd = fopen(userinfo_table_name, "rb")) )
 	{
@@ -577,6 +626,7 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 	DBUsersInformation* record = malloc( sizeof(DBUsersInformation) );
 	if ( !record )
 	{
+		fclose(fd);
 		fprintf(stderr, "[%s] %s In function \"db_readline_from_tables\" memory error with \"record\"\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return NULL;
 	}
@@ -586,6 +636,16 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 
 	char buffer[100] = { 0 };
 	itoa(record->ID, buffer, 99);
+
+
+	char* result = malloc(sizeof(char) * BUFFER_SIZE);
+	if ( !result )
+	{
+		fclose(fd);
+		free(record);
+		fprintf(stderr, "[%s] %s In function \"db_readline_from_tables\" memory error with \"result\"!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+		return NULL;
+	}
 
 	int pos = strlen(buffer);
 	memcpy(result, buffer, pos);
@@ -649,6 +709,7 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 	fd = NULL;
 	if ( !(fd = fopen(usersessions_table_name, "rb")) )
 	{
+		free(result);
 		fprintf(stderr, "[%s] %s In function \"db_readline_from_tables\" unable to open file \"%s\". Is it exist?\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, userinfo_table_name);
 		return NULL;
 	}
@@ -656,6 +717,8 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 	DBXUsersInformation* xrecord = malloc( sizeof(DBXUsersInformation) );
 	if ( !xrecord )
 	{
+		fclose(fd);
+		free(result);
 		fprintf(stderr, "[%s] %s In function \"db_readline_from_tables\" memory error with \"xrecord\"\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return NULL;
 	}
@@ -746,8 +809,8 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 
 int db_writeline_to_tables(char* writeline, const char* userinfo_table_name, const char* usersessions_table_name)
 {
-	/*writeline string format	=>	id|username|pass|rank|realname|age|quote|muted|start_mutetime|mute_time|mute_time_left|last_ip|last_date_in|last_date_out|registration_date*/
-	/* если в поле значение undefined, то обновлять это поле не нужно */
+	/* writeline string format	=>	id|username|pass|rank|realname|age|quote|muted|start_mutetime|mute_time|mute_time_left|last_ip|last_date_in|last_date_out|registration_date */
+	/* если в поле значение undefined или в поле rank значение u, то обновлять это поле не нужно */
 
 	char cur_time[MAX_TIME_STR_SIZE];
 

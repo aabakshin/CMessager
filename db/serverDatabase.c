@@ -131,16 +131,21 @@ static void db_session_check_lf(Server* serv_ptr, Session* sess)
 		return;
 
 	char* client_line = malloc(pos+1);
+	if ( !client_line )
+	{
+		fprintf(stderr, "[%s] %s In function \"db_session_check_lf\" unable to allocate memory to \"client_line\"\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return;
+	}
 
 	memcpy(client_line, sess->data->buf, pos);
 	client_line[pos] = '\0';
-	
-	sess->data->buf_used -= (pos+1);
-	memmove(sess->data->buf, sess->data->buf+pos+1, sess->data->buf_used);
 	if ( client_line[pos-1] == '\r' )
 		client_line[pos-1] = '\0';
 
-	printf("[%s] %s Client Line: ( %s )\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, client_line);
+	sess->data->buf_used -= (pos + 1);
+	memmove(sess->data->buf, sess->data->buf+pos+1, sess->data->buf_used);
+
+	printf("[%s] %s Client Line: ( %s )\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, client_line); /* debug */
 
 	db_session_message_handler(serv_ptr, sess, client_line);
 }
@@ -454,8 +459,6 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 		int len = strlen(msg_to_send);
 		int wc = write(sess->data->fd, msg_to_send, len);
 		printf("[%s] %s Sent %d\\%d bytes to %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, sess->data->addr);
-
-		return;
 	}
 }
 
@@ -492,15 +495,16 @@ int db_server_init(int port)
 	struct sockaddr_in addr;
 	char cur_time[CURRENT_TIME_SIZE];
 
+
 	printf("[%s] %s Creating socket..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if ( listen_sock == -1 )
+	if ( listen_sock < 0 )
 	{
 		fprintf(stderr, "[%s] %s socket() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
 		return -1;
 	}
-	int opt = 1;																											/* Предотвращение "залипания" TCP порта */
-	setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+	int opt = 1;
+	setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)); /* Предотвращение "залипания" TCP порта */
 	
 	
 	printf("[%s] %s Binding socket to local address..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
@@ -522,7 +526,9 @@ int db_server_init(int port)
 		return -1;
 	}
 	
+
 	printf("[%s] %s Waiting for connections..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+
 
 	return listen_sock;
 }
@@ -532,6 +538,7 @@ static int db_server_accept_client(Server* serv_ptr)
 	struct sockaddr_in addr;
 	socklen_t len = sizeof(addr);
 	char cur_time[CURRENT_TIME_SIZE];
+
 
 	if ( serv_ptr == NULL )
 	{
@@ -557,6 +564,15 @@ static int db_server_accept_client(Server* serv_ptr)
 	}
 	
 	ClientData* data = malloc(sizeof(ClientData));
+	if ( !data )
+	{
+		if ( buf_ip )
+			free(buf_ip);
+
+		fprintf(stderr, "[%s] %s In function \"db_server_accept_client\" unable to allocate memory to \"data\" pointer!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+
+		return -1;
+	}
 	data->fd = client_sock;
 	
 	int i;
@@ -582,6 +598,7 @@ static void db_server_close_session(Server* serv_ptr, int sock)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 	
+	
 	if ( serv_ptr == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_server_close_session\" \"serv_ptr\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
@@ -594,24 +611,17 @@ static void db_server_close_session(Server* serv_ptr, int sock)
 		return;
 	}
 	
-	Session* sess = serv_ptr->sess_list;
-	while ( sess )
-	{
-		if ( (sess->data != NULL) && (sess->data->fd == sock) )
-		{
-			close(sock);
-			break;
-		}
 
-		sess = sess->next;
-	}
+	Session* sess = db_get_session_by_fd(serv_ptr, sock);
 
-	if ( sess == NULL )
+	if ( sess == NULL ) 
 	{
 		fprintf(stderr, "[%s] %s In function \"db_server_close_session\" unable find \"sock\" value in sessions list!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return;
 	}
+	close(sock);
 
+	
 	printf("[%s] %s Lost connection from %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, sess->data->addr);
 
 	const ClientData* data = sess_remove(&serv_ptr->sess_list, sess->data);
@@ -693,12 +703,8 @@ int db_server_running(Server* serv_ptr)
 		while ( sess != NULL )
 		{
 			if ( (sess->data != NULL) && FD_ISSET(sess->data->fd, &readfds) )
-			{
-				Session* client_sess = db_get_session_by_fd(serv_ptr, sess->data->fd);
-				if ( client_sess != NULL )
-					if ( !db_session_do_read(serv_ptr, client_sess) )
-						db_server_close_session(serv_ptr, sess->data->fd);
-			}
+				if ( !db_session_do_read(serv_ptr, sess) )
+					db_server_close_session(serv_ptr, sess->data->fd);
 
 			sess = sess->next;
 		}
