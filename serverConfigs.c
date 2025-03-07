@@ -143,6 +143,7 @@ char** parse_ops_file(int* strings_count)
 char** parse_configuration_file(int* strings_count)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
+	*strings_count = 0;
 
 
 	/* пытаемся открыть конфиг-файл */
@@ -200,8 +201,6 @@ char** parse_configuration_file(int* strings_count)
 	}
 	else
 	{
-		*strings_count = 0;
-
 		int ch;
 		while ( (ch = fgetc(cfg_ptr)) != EOF )
 			if ( ch == '\n' )
@@ -230,6 +229,7 @@ char** parse_configuration_file(int* strings_count)
 
 		return NULL;
 	}
+
 	int i;
 	for ( i = 0; i < CONFIG_STRINGS_NUM; i++ )
 	{
@@ -269,6 +269,5 @@ char** parse_configuration_file(int* strings_count)
 	
 	return config_strings;
 }
-
 
 #endif
