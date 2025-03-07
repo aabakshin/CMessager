@@ -42,10 +42,7 @@ void alrm_handler(int signo)
 	alarm(0);
 	
 	if ( serv )
-	{
-		close(serv->ls);
-		close(serv->db_sock);
-		
+	{	
 		if ( serv->sess_array )
 			free(serv->sess_array);
 		free(serv);
@@ -874,7 +871,7 @@ int server_init(int port)
 
 	printf("[%s] %s Creating socket..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (listen_sock == -1)
+	if ( listen_sock < 0 )
 	{
 		fprintf(stderr, "[%s] %s socket() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
 		return 0;
@@ -940,6 +937,7 @@ int server_init(int port)
 	printf("[%s] %s Connected.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 
 	
+	printf("[%s] %s Parsing configuration file...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	int strings_count = 0;
 	char** config_strings = parse_configuration_file(&strings_count);
 	
@@ -971,6 +969,7 @@ int server_init(int port)
 		free(config_strings[i]);
 	free(config_strings);
 
+
 	/////////////////////////////////////////////
 	int db_records_num = atoi(parsed_options[0][1]);
 	if ( db_records_num < 1 )
@@ -1001,6 +1000,7 @@ int server_init(int port)
 		return 0;
 	}
 	/////////////////////////////////////////////
+	printf("[%s] %s Done!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 
 
 	serv = malloc( sizeof(Server) );
@@ -1016,7 +1016,10 @@ int server_init(int port)
 	if ( !serv->sess_array )
 	{
 		fprintf(stderr, "[%s] %s memory error in \"serv\" struct records!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		free(serv);
+
+		if (serv)
+			free(serv);
+
 		return 0;
 	}	
 	serv->sess_array_size = db_records_num;
@@ -1048,14 +1051,14 @@ int server_init(int port)
 	int data_size = i;
 	int wc = write(serv->db_sock, send_buf, data_size);
 	
-
+	//////////////////////////////////////////////////////////////////////////////////
 	alarm(TIMER_VALUE);
 	
 	char read_buf[BUFFER_SIZE];
 	int rc = read(serv->db_sock, read_buf, sizeof(read_buf));
 	
 	alarm( 0 );
-	
+	//////////////////////////////////////////////////////////////////////////////////
 
 	if ( rc < 1 )
 	{
@@ -1063,9 +1066,6 @@ int server_init(int port)
 		
 		if ( serv )
 		{
-			close(serv->ls);
-			close(serv->db_sock);
-		
 			if ( serv->sess_array )
 				free(serv->sess_array);
 			free(serv);
@@ -1090,9 +1090,6 @@ int server_init(int port)
 		
 		if ( serv )
 		{
-			close(serv->ls);
-			close(serv->db_sock);
-		
 			if ( serv->sess_array )
 				free(serv->sess_array);
 			free(serv);
@@ -1100,8 +1097,9 @@ int server_init(int port)
 
 		return 0;
 	}
-	
 	printf("[%s] %s Database server successfully initialized.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	
+
 	printf("[%s] %s Waiting for connections..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 
 	return 1;
