@@ -242,18 +242,23 @@ int db_create_userinfo_table(int records_num, const char* table_name)
 		{		
 			return 0;
 		}
-		else
+		
+		if ( read_size == records_num )
 		{
-			if ( (fd = fopen(table_name, "ab")) == NULL )
-			{
-				fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
-				return 0;
-			}
-
-			if ( read_size > 0 )
-				if ( records_num > read_size )
-					records_num -= read_size;
+			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" table \"%s\" is already initialized!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
+			return 1;
 		}
+
+		if ( (fd = fopen(table_name, "ab")) == NULL )
+		{
+			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+			return 0;
+		}	
+
+		if ( read_size > 0 )
+			if ( records_num > read_size )
+				records_num -= read_size;
+		
 	}
 
 	DBUsersInformation* new_record = malloc( sizeof(DBUsersInformation) );
@@ -310,7 +315,7 @@ int db_usersessions_table_get_size(const char* table_name)
 		return -1;
 	}
 
-	DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
+	DBXUsersInformation* record = malloc(sizeof(DBXUsersInformation));
 	if ( !record )
 	{
 		fclose(fd);
@@ -321,7 +326,7 @@ int db_usersessions_table_get_size(const char* table_name)
 
 	while ( !feof(fd) )
 	{
-		fread(record, sizeof(DBUsersInformation), 1, fd);
+		fread(record, sizeof(DBXUsersInformation), 1, fd);
 		records_num++;		
 	}
 	
@@ -343,7 +348,7 @@ int db_usersessions_table_is_empty(const char* table_name)
 		return 0;
 	}
 
-	int records_num = db_userinfo_table_get_size(table_name);
+	int records_num = db_usersessions_table_get_size(table_name);
 
 	if ( records_num > 0 )
 	{
@@ -354,7 +359,7 @@ int db_usersessions_table_is_empty(const char* table_name)
 			return 0;
 		}
 
-		DBUsersInformation* first_record = malloc(sizeof(DBUsersInformation));
+		DBXUsersInformation* first_record = malloc(sizeof(DBXUsersInformation));
 		if ( !first_record )
 		{
 			fclose(fd);
@@ -365,7 +370,7 @@ int db_usersessions_table_is_empty(const char* table_name)
 
 		while ( !feof(fd) )
 		{
-			fread(first_record, sizeof(DBUsersInformation), 1, fd);
+			fread(first_record, sizeof(DBXUsersInformation), 1, fd);
 			if ( first_record->ID > -1 )
 			{
 				non_empty_record = 1;
@@ -468,22 +473,27 @@ int db_create_usersessions_table(int records_num, const char* table_name)
 		fclose(fd);
 	
 		int read_size = db_usersessions_table_get_size(table_name);
-		if ( read_size <= -1 )
+		if ( read_size < 0 )
 		{		
 			return 0;
 		}
-		else
-		{
-			if ( (fd = fopen(table_name, "ab")) == NULL )
-			{
-				fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
-				return 0;
-			}
 
-			if ( read_size > 0 )
-				if ( records_num > read_size )
-					records_num -= read_size;
+		if ( read_size == records_num )
+		{
+			fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" table \"%s\" is already initialized!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
+			return 1;
 		}
+		
+		if ( (fd = fopen(table_name, "ab")) == NULL )
+		{
+			fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+			return 0;
+		}
+
+		if ( read_size > 0 )
+			if ( records_num > read_size )
+				records_num -= read_size;
+		
 	}
 
 
