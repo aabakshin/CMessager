@@ -4,6 +4,7 @@
 #define SERVERDATABASE_H_SENTRY
 
 #include "SessionList.h"
+#include <stdio.h>
 
 enum 
 {

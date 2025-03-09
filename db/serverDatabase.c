@@ -39,7 +39,7 @@ const char* db_commands_names[] =
 			NULL
 };
 
-static int db_session_do_read(Server* serv_ptr,Session* sess);
+static int db_session_do_read(Server* serv_ptr, Session* sess);
 static void db_session_message_handler(Server* serv_ptr, Session* sess, const char* client_line);
 static void db_session_check_lf(Server* serv_ptr, Session* sess);
 
@@ -232,15 +232,17 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 		memcpy(usersessions_name, mes_tokens[3], len);
 		usersessions_name[len] = '\0';
 		
-		int ret_code1 = db_create_userinfo_table(records_num, usersinfo_name);
-		int ret_code2 = db_create_usersessions_table(records_num, usersessions_name);
+
+		int ret_value1 = db_create_userinfo_table(records_num, usersinfo_name);
+		int ret_value2 = db_create_usersessions_table(records_num, usersessions_name);
 		
 		const char* msg_to_send = NULL;
-		if ( ret_code1 && ret_code2 )
+		if ( ret_value1 && ret_value2 )
 		{
 			msg_to_send = "DB_INITIALIZATION_SUCCESS\n";
 			memcpy(serv_ptr->userinfo_table_name, usersinfo_name, strlen(usersinfo_name)+1);
 			memcpy(serv_ptr->usersessions_table_name, usersessions_name, strlen(usersessions_name)+1);
+			serv_ptr->db_records_num = records_num;
 		}
 		else
 			msg_to_send = "DB_INITIALIZATION_ERROR\n";

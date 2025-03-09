@@ -238,7 +238,7 @@ int db_create_userinfo_table(int records_num, const char* table_name)
 		fclose(fd);
 		
 		int read_size = db_userinfo_table_get_size(table_name);
-		if ( read_size <= -1 )
+		if ( read_size < 0 )
 		{		
 			return 0;
 		}
