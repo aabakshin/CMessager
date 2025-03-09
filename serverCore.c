@@ -839,14 +839,21 @@ static int session_do_read(ClientSession* sess)
 	
 	if ( rc < 1 )
 	{
-		sess->state = fsm_error;
-		printf("%s\n", "()");
+		if ( rc == 0 )
+		{
+			sess->state = fsm_finish;
+			printf("%s\n", "()");
+		}
+		else
+		{
+			sess->state = fsm_error;
+			printf("(errno value = %d\n)", errno);
+		}
 
 		return 0;
 	}
 
 	sess->buf_used += rc;
-	session_check_lf(sess);
 	
 	if ( sess->buf_used >= BUFSIZE )
 	{
@@ -855,6 +862,8 @@ static int session_do_read(ClientSession* sess)
 		
 		return 0;
 	}
+
+	session_check_lf(sess);
 
 	if ( sess->state == fsm_finish )
 		return 0;
@@ -1204,25 +1213,25 @@ int server_running(void)
 	int res, max_d;
 	char cur_time[CURRENT_TIME_SIZE];
 
-	while (1)
+	while ( 1 )
 	{
 		FD_ZERO(&readfds);
 		FD_SET(serv->ls, &readfds);
 		max_d = serv->ls;
 
 		int i;
-		for (i = 0; i < serv->sess_array_size; i++)
+		for ( i = 0; i < serv->sess_array_size; i++ )
 		{
-			if (serv->sess_array[i])
+			if ( serv->sess_array[i] )
 			{
 				FD_SET(i, &readfds);
-				if (i > max_d)
+				if ( i > max_d )
 					max_d = i;
 			}
 		}
 
 		res = select(max_d+1, &readfds, NULL, NULL, NULL);
-		if (res == -1)
+		if ( res == -1 )
 		{
 			if ( errno == EINTR )
 			{
@@ -1234,10 +1243,6 @@ int server_running(void)
 					
 					if ( serv->sess_array )
 						free(serv->sess_array);
-
-					close(serv->ls);
-					close(serv->db_sock);
-
 					free(serv);
 
 					sl_clear(&clients_online);
@@ -1245,6 +1250,7 @@ int server_running(void)
 					if ( exit_flag )
 						break;
 				}
+
 				fprintf(stderr, "[%s] %s Got some signal (#%d)\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, errno);
 			}
 			else
@@ -1257,8 +1263,8 @@ int server_running(void)
 		if ( FD_ISSET(serv->ls, &readfds) )
 			server_accept_client();
 
-		for (i = 0; i < serv->sess_array_size; i++)
-			if (serv->sess_array[i] && FD_ISSET(i, &readfds))
+		for ( i = 0; i < serv->sess_array_size; i++ )
+			if ( serv->sess_array[i] && FD_ISSET(i, &readfds) )
 				if ( !session_do_read(serv->sess_array[i]) )
 					server_close_session(i);
 	}
