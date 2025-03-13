@@ -270,4 +270,85 @@ char** parse_configuration_file(int* strings_count)
 	return config_strings;
 }
 
+int read_configuration_file(ConfigFields* cfg)
+{
+	char cur_time[CURRENT_TIME_SIZE];
+
+	printf("[%s] %s Parsing configuration file...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	int strings_count = 0;
+	char** config_strings = parse_configuration_file(&strings_count);
+
+	if ( (config_strings == NULL) || (strings_count == 0) )
+	{
+		fprintf(stderr, "[%s] %s Unable to parse configuration file. Return value is null!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
+	char parsed_options[CONFIG_STRINGS_NUM][2][100];
+	int i = 0;
+	
+	while ( i < CONFIG_STRINGS_NUM )
+	{
+		char* istr = strtok(config_strings[i], "=");
+		int j = 0;
+		while ( istr != NULL )
+		{
+			strcpy(parsed_options[i][j], istr);
+			j++;
+			if ( j > 1 )
+				break;
+			istr = strtok(NULL, "=");
+		}
+		i++;
+	}
+
+	for ( i = 0; i < strings_count; i++ )
+		free(config_strings[i]);
+	free(config_strings);
+
+
+	/////////////////////////////////////////////
+	int db_records_num = atoi(parsed_options[0][1]);
+	if ( db_records_num < 1 )
+	{
+		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[0][1]);
+		return 0;
+	}
+	cfg->records_num = db_records_num;
+	/////////////////////////////////////////////
+
+	
+	/////////////////////////////////////////////
+	char db_userinfo_filename[100];
+	strcpy(db_userinfo_filename, parsed_options[1][1]);
+	if ( (strcmp(db_userinfo_filename, "undefined") == 0) || (db_userinfo_filename[0] == '\0') )
+	{
+		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[1][1]);
+		return 0;
+	}
+	strcpy(cfg->userinfo_filename, db_userinfo_filename);
+	/////////////////////////////////////////////
+
+	
+	/////////////////////////////////////////////
+	char db_usersessions_filename[100];
+	strcpy(db_usersessions_filename, parsed_options[2][1]);
+	if ( (strcmp(db_userinfo_filename, "undefined") == 0) || (db_userinfo_filename[0] == '\0') )
+	{
+		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[2][1]);
+		return 0;
+	}
+	strcpy(cfg->usersessions_filename, db_usersessions_filename);
+	/////////////////////////////////////////////
+
+	printf("[%s] %s Done!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+
+	return 1;
+}
+
+int write_configuration_file(const ConfigFields* cfg)
+{
+
+}
+
 #endif

@@ -17,11 +17,20 @@
 enum
 {
 	CONFIG_STRINGS_NUM							=			 3,
-	CONFIG_STRING_SIZE							=			80
+	CONFIG_STRING_SIZE							=		   100
 };
+
+struct ConfigFields {
+	int records_num;
+	char userinfo_filename[100];
+	char usersessions_filename[100];
+};
+typedef struct ConfigFields ConfigFields;
 
 
 char** parse_ops_file(int* strings_count);
 char** parse_configuration_file(int* strings_count);
+int read_configuration_file(ConfigFields* cfg);
+int write_configuration_file(const ConfigFields* cfg);
 
 #endif

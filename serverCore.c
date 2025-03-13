@@ -945,72 +945,14 @@ int server_init(int port)
 	}
 	printf("[%s] %s Connected.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 
-	
-	printf("[%s] %s Parsing configuration file...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
-	int strings_count = 0;
-	char** config_strings = parse_configuration_file(&strings_count);
-	
-	if ( (config_strings == NULL) || (strings_count == 0) )
+	ConfigFields cfg;
+	memset(&cfg, 0, sizeof(struct ConfigFields));
+
+	if ( !read_configuration_file(&cfg) )
 	{
-		fprintf(stderr, "[%s] %s Unable to parse configuration file. Return value is null!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s Unable to read configuration file \"%s\"!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
 		return 0;
 	}
-
-	char parsed_options[CONFIG_STRINGS_NUM][2][100];
-	int i = 0;
-	
-	while ( i < CONFIG_STRINGS_NUM )
-	{
-		char* istr = strtok(config_strings[i], "=");
-		int j = 0;
-		while ( istr != NULL )
-		{
-			strcpy(parsed_options[i][j], istr);
-			j++;
-			if ( j > 1 )
-				break;
-			istr = strtok(NULL, "=");
-		}
-		i++;
-	}
-
-	for ( i = 0; i < strings_count; i++ )
-		free(config_strings[i]);
-	free(config_strings);
-
-
-	/////////////////////////////////////////////
-	int db_records_num = atoi(parsed_options[0][1]);
-	if ( db_records_num < 1 )
-	{
-		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[0][1]);
-		return 0;
-	}
-	/////////////////////////////////////////////
-
-	
-	/////////////////////////////////////////////
-	char db_userinfo_filename[100];
-	strcpy(db_userinfo_filename, parsed_options[1][1]);
-	if ( (strcmp(db_userinfo_filename, "undefined") == 0) || (db_userinfo_filename[0] = '\0') )
-	{
-		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[1][1]);
-		return 0;
-	}
-	/////////////////////////////////////////////
-
-	
-	/////////////////////////////////////////////
-	char db_usersessions_filename[100];
-	strcpy(db_usersessions_filename, parsed_options[2][1]);
-	if ( (strcmp(db_userinfo_filename, "undefined") == 0) || (db_userinfo_filename[0] = '\0') )
-	{
-		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[2][1]);
-		return 0;
-	}
-	/////////////////////////////////////////////
-	printf("[%s] %s Done!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
-
 
 	serv = malloc( sizeof(Server) );
 	if ( !serv )
@@ -1021,7 +963,7 @@ int server_init(int port)
 
 	serv->db_sock = srv_db_sock;
 	serv->ls = listen_sock;
-	serv->sess_array = malloc(db_records_num * sizeof(ClientSession*));
+	serv->sess_array = malloc(cfg.records_num * sizeof(ClientSession*));
 	if ( !serv->sess_array )
 	{
 		fprintf(stderr, "[%s] %s memory error in \"serv\" struct records!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
@@ -1031,9 +973,10 @@ int server_init(int port)
 
 		return 0;
 	}	
-	serv->sess_array_size = db_records_num;
+	serv->sess_array_size = cfg.records_num;
 	
-	for (i = 0; i < db_records_num; i++)
+	int i;
+	for (i = 0; i < serv->sess_array_size; i++)
 		serv->sess_array[i] = NULL;
 
 
@@ -1041,23 +984,21 @@ int server_init(int port)
 
 	char send_buf[BUFFER_SIZE];
 	const char* init_db_msg = "INIT_TABLES|";
-	int len = strlen(init_db_msg);
-	memcpy(send_buf, init_db_msg, len);
+	int pos = strlen(init_db_msg);
+	memcpy(send_buf, init_db_msg, pos);
 
-	i = len;
-	int k;
-	for ( k = 0; k < CONFIG_STRINGS_NUM; k++ )
-	{
-		int j = 0;
-		for ( ; parsed_options[k][1][j]; i++, j++ )
-			send_buf[i] = parsed_options[k][1][j];
-		send_buf[i] = '|';
-		i++;
-	}
-	send_buf[i-1] = '\n';
-	send_buf[i] = '\0';
+	strcat(send_buf, cfg.userinfo_filename);
+	pos += strlen(cfg.userinfo_filename);
+	send_buf[pos] = '|';
+	pos++;
+	send_buf[pos] = '\0';
+
+	strcat(send_buf, cfg.usersessions_filename);
+	pos += strlen(cfg.usersessions_filename);
+	send_buf[pos] = '\n';
+	send_buf[pos+1] = '\0';
 	
-	int data_size = i;
+	int data_size = pos+1;
 	int wc = write(serv->db_sock, send_buf, data_size);
 	
 	//////////////////////////////////////////////////////////////////////////////////
@@ -1134,7 +1075,7 @@ static int server_accept_client(void)
 		while ( client_sock >= newlen )
 			newlen += serv->sess_array_size;
 
-		serv->sess_array = realloc(serv->sess_array, newlen*sizeof(ClientSession*));
+		serv->sess_array = realloc(serv->sess_array, newlen * sizeof(ClientSession*));
 		
 		int records_num = newlen - serv->sess_array_size;
 		init_userinfo_database(records_num, 1);
@@ -1169,7 +1110,6 @@ static int server_accept_client(void)
 			fprintf(cfgPtr, "%s\n", param_string);
 		}
 		fclose(cfgPtr);
-		/*---------------------------------------------------*/
 	}
 
 	serv->sess_array[client_sock] = make_new_session(client_sock, &addr);

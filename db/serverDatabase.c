@@ -615,19 +615,17 @@ static void db_server_close_session(Server* serv_ptr, int sock)
 	
 
 	Session* sess = db_get_session_by_fd(serv_ptr, sock);
-
 	if ( sess == NULL ) 
 	{
 		fprintf(stderr, "[%s] %s In function \"db_server_close_session\" unable find \"sock\" value in sessions list!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return;
 	}
+
 	close(sock);
 
-	
 	printf("[%s] %s Lost connection from %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, sess->data->addr);
 
 	const ClientData* data = sess_remove(&serv_ptr->sess_list, sess->data);
-
 	if ( data )
 		free((void*) data);
 }
@@ -680,8 +678,6 @@ int db_server_running(Server* serv_ptr)
 
 						sess = sess->next;
 					}
-				
-					close(serv_ptr->ls);
 
 					if ( sess_clear(&serv_ptr->sess_list, 1) )
 						serv_ptr->sess_list = NULL;
