@@ -274,6 +274,12 @@ int read_configuration_file(ConfigFields* cfg)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
+	if ( cfg == NULL )
+	{
+		fprintf(stderr, "[%s] %s Unable to parse configuration file. \"cfg\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
 	printf("[%s] %s Parsing configuration file...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	int strings_count = 0;
 	char** config_strings = parse_configuration_file(&strings_count);
@@ -348,7 +354,60 @@ int read_configuration_file(ConfigFields* cfg)
 
 int write_configuration_file(const ConfigFields* cfg)
 {
+	char cur_time[CURRENT_TIME_SIZE];
+	
+	if ( cfg == NULL )
+	{
+		fprintf(stderr, "[%s] %s Unable to parse configuration file. \"cfg\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
 
+	char cfg_records_num[100];
+	itoa(cfg->records_num, cfg_records_num, 9);
+	
+	char* values[] = 
+	{
+			cfg_records_num,
+			(char*)cfg->userinfo_filename,
+			(char*)cfg->usersessions_filename
+	};
+
+	FILE* cfgPtr = NULL;
+	if ( !(cfgPtr = fopen(CONFIG_NAME, "r+")) )
+	{
+		fprintf(stderr, "[%s] %s Unable to open \"%s\" config file. Trying to create one for you.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
+		if ( !(cfgPtr = fopen(CONFIG_NAME, "w")) )
+		{
+			fprintf(stderr, "[%s] %s You don't have permission to create file in this directory.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+			return 0;
+		}
+	}
+
+	int i = 0;
+	while ( i < CONFIG_STRINGS_NUM )
+	{
+		char buffer[1024];
+		memset(buffer, 0, sizeof(buffer));
+
+		int pos = 0;
+		int len = strlen(config_params_names[i]);
+		strcpy(buffer, config_params_names[i]);
+		pos += len;
+		buffer[pos] = '=';
+		pos++;
+		buffer[pos] = '\0';
+		strcat(buffer, values[i]);
+		pos += strlen(values[i]);
+		buffer[pos] = '\0';
+
+		fprintf(cfgPtr, "%s\n", buffer);
+	
+		i++;
+	}
+
+	fclose(cfgPtr);
+
+	return 1;
 }
 
 #endif

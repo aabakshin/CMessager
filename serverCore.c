@@ -885,7 +885,9 @@ int server_init(int port)
 		fprintf(stderr, "[%s] %s socket() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
 		return 0;
 	}
-	int opt = 1;																											/* Предотвращение "залипания" TCP порта */
+
+	/* Предотвращение "залипания" TCP порта */
+	int opt = 1;
 	setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 	
 	
@@ -1076,10 +1078,15 @@ static int server_accept_client(void)
 			newlen += serv->sess_array_size;
 
 		serv->sess_array = realloc(serv->sess_array, newlen * sizeof(ClientSession*));
-		
-		int records_num = newlen - serv->sess_array_size;
-		init_userinfo_database(records_num, 1);
-		init_ext_userinfo_database(records_num, 1);
+		if ( !serv->sess_array )
+		{
+			fprintf(stderr, "[%s] %s memory error in \"serv\" struct records!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+
+			if (serv)
+				free(serv);
+
+			return -1;
+		}
 
 		int i;
 		for (i = serv->sess_array_size; i < newlen; i++)
@@ -1087,29 +1094,21 @@ static int server_accept_client(void)
 		serv->sess_array_size = newlen;
 		
 		/* Записываем новый размер базы данных в конфиг-файл */
-		char num[10];
-		itoa(newlen, num, 9);
-		char param_string[CONFIG_STRING_SIZE] = "currentDbSize=";
-		strncat(param_string, num, strlen(num)+1);
+		ConfigFields cfg;
+		cfg.records_num = newlen;
+		memset(cfg.userinfo_filename, 0, sizeof(cfg.userinfo_filename));
+		strcpy(cfg.userinfo_filename, CONFIG_SETTING_DEFAULT_USERSDATA_DB_NAME_VALUE);
+		memset(cfg.usersessions_filename, 0, sizeof(cfg.usersessions_filename));
+		strcpy(cfg.usersessions_filename, CONFIG_SETTING_DEFAULT_USERSSESSIONS_DB_NAME_VALUE);
 		
+		if ( !write_configuration_file(&cfg) )
+		{
+			return -1;
+		}
+		printf("[%s] %s Configuration file \"%s\" has been updated!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, CONFIG_NAME);
 
-		FILE* cfgPtr = NULL;
-		if ( !(cfgPtr = fopen(CONFIG_NAME, "r+")) )
-		{
-			fprintf(stderr, "[%s] %s Unable to open \"%s\" config file.Trying to create one for you.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
-			if ( !(cfgPtr = fopen(CONFIG_NAME, "w")) )
-			{
-				fprintf(stderr, "[%s] %s You don't have permission to create file in this directory.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-				return -1;
-			}
-			fprintf(cfgPtr, "%s\n", param_string);
-		}
-		else
-		{
-			rewind(cfgPtr);
-			fprintf(cfgPtr, "%s\n", param_string);
-		}
-		fclose(cfgPtr);
+		init_userinfo_database(newlen, 1);
+		init_ext_userinfo_database(newlen, 1);
 	}
 
 	serv->sess_array[client_sock] = make_new_session(client_sock, &addr);
