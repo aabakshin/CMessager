@@ -22,8 +22,8 @@ enum
 
 struct ConfigFields {
 	int records_num;
-	char userinfo_filename[100];
-	char usersessions_filename[100];
+	char userinfo_filename[CONFIG_STRING_SIZE/2];
+	char usersessions_filename[CONFIG_STRING_SIZE/2];
 };
 typedef struct ConfigFields ConfigFields;
 

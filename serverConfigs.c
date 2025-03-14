@@ -164,7 +164,7 @@ char** parse_configuration_file(int* strings_count)
 		int j = 0;
 		while ( j < CONFIG_STRINGS_NUM )
 		{
-			char cfg_setting[100] = { 0 };
+			char cfg_setting[CONFIG_STRING_SIZE] = { 0 };
 			
 			int len = strlen(config_params_names[j]);
 			int pos = len;
@@ -258,6 +258,10 @@ char** parse_configuration_file(int* strings_count)
 	while ( !feof(cfg_ptr) )
 	{
 		fgets(config_strings[i], CONFIG_STRING_SIZE, cfg_ptr);
+
+		int len = strlen(config_strings[i]);
+		config_strings[i][len-1] = '\0';
+
 		i++;
 		if ( i >= CONFIG_STRINGS_NUM )
 			break;
@@ -290,7 +294,7 @@ int read_configuration_file(ConfigFields* cfg)
 		return 0;
 	}
 
-	char parsed_options[CONFIG_STRINGS_NUM][2][100];
+	char parsed_options[CONFIG_STRINGS_NUM][2][CONFIG_STRING_SIZE/2];
 	int i = 0;
 	
 	while ( i < CONFIG_STRINGS_NUM )
@@ -325,7 +329,7 @@ int read_configuration_file(ConfigFields* cfg)
 
 	
 	/////////////////////////////////////////////
-	char db_userinfo_filename[100];
+	char db_userinfo_filename[CONFIG_STRING_SIZE/2];
 	strcpy(db_userinfo_filename, parsed_options[1][1]);
 	if ( (strcmp(db_userinfo_filename, "undefined") == 0) || (db_userinfo_filename[0] == '\0') )
 	{
@@ -337,7 +341,7 @@ int read_configuration_file(ConfigFields* cfg)
 
 	
 	/////////////////////////////////////////////
-	char db_usersessions_filename[100];
+	char db_usersessions_filename[CONFIG_STRING_SIZE/2];
 	strcpy(db_usersessions_filename, parsed_options[2][1]);
 	if ( (strcmp(db_userinfo_filename, "undefined") == 0) || (db_userinfo_filename[0] == '\0') )
 	{
@@ -386,7 +390,7 @@ int write_configuration_file(const ConfigFields* cfg)
 	int i = 0;
 	while ( i < CONFIG_STRINGS_NUM )
 	{
-		char buffer[1024];
+		char buffer[CONFIG_STRING_SIZE];
 		memset(buffer, 0, sizeof(buffer));
 
 		int pos = 0;
