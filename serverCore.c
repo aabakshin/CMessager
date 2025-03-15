@@ -23,6 +23,7 @@ static void session_handler_wait_message(ClientSession* sess, const char* client
 static void session_fsm_step(ClientSession* sess, char* client_line);
 static void session_check_lf(ClientSession* sess);
 static int session_do_read(ClientSession* sess);
+static int send_config_data_to_db(const ConfigFields* cfg);
 static int server_accept_client(void);
 
 StringList* clients_online = NULL;
@@ -40,12 +41,14 @@ void alrm_handler(int signo)
 	signal(SIGALRM, alrm_handler);
 
 	alarm(0);
-	
+
 	if ( serv )
 	{	
 		if ( serv->sess_array )
 			free(serv->sess_array);
 		free(serv);
+
+		sl_clear(&clients_online);
 	}
 
 	fprintf(stderr, "[%s] %s Unable to connect to database server. Connection timeout!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
@@ -217,7 +220,7 @@ static void session_handler_login_wait_login(ClientSession* sess, const char* cl
 		fprintf(stderr, "[%s] %s In function \"session_handler_login_wait_login\" params \"sess\" or \"client_line\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return;
 	}
-
+	
 	StringList* list = clients_online;
 	while ( list )
 	{
@@ -871,6 +874,63 @@ static int session_do_read(ClientSession* sess)
 	return 1;
 }
 
+static int send_config_data_to_db(const ConfigFields* cfg)
+{
+	char cur_time[CURRENT_TIME_SIZE];
+
+	char send_buf[BUFFER_SIZE];
+	const char* init_db_msg = "INIT_TABLES|";
+	int pos = strlen(init_db_msg);
+	memcpy(send_buf, init_db_msg, pos);
+
+	strcat(send_buf, cfg->userinfo_filename);
+	pos += strlen(cfg->userinfo_filename);
+	send_buf[pos] = '|';
+	pos++;
+	send_buf[pos] = '\0';
+
+	strcat(send_buf, cfg->usersessions_filename);
+	pos += strlen(cfg->usersessions_filename);
+	send_buf[pos] = '\n';
+	send_buf[pos+1] = '\0';
+	
+	int data_size = pos+1;
+	int wc = write(serv->db_sock, send_buf, data_size);
+	
+	//////////////////////////////////////////////////////////////////////////////////
+	alarm(TIMER_VALUE);
+	
+	char read_buf[BUFFER_SIZE];
+	int rc = read(serv->db_sock, read_buf, sizeof(read_buf));
+	
+	alarm( 0 );
+	//////////////////////////////////////////////////////////////////////////////////
+
+	if ( rc < 1 )
+	{
+		fprintf(stderr, "[%s] %s Database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+	
+	if ( rc < BUFFER_SIZE )
+	{
+		if ( read_buf[rc-1] == '\n' )
+			read_buf[rc-1] = '\0';
+	}
+	else
+	{
+		read_buf[BUFFER_SIZE-1] = '\0';
+	}
+	
+	if ( strcmp("DB_INITIALIZATION_SUCCESS", read_buf) != 0 )
+	{
+		fprintf(stderr, "[%s] %s Database server unable to initialize himself.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);		
+		return 0;
+	}
+	
+	return 1;
+}
+
 int server_init(int port)
 {
 	signal(SIGALRM, alrm_handler);
@@ -982,74 +1042,21 @@ int server_init(int port)
 		serv->sess_array[i] = NULL;
 
 
-	printf("[%s] %s Sending initialization data to database server...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
-
-	char send_buf[BUFFER_SIZE];
-	const char* init_db_msg = "INIT_TABLES|";
-	int pos = strlen(init_db_msg);
-	memcpy(send_buf, init_db_msg, pos);
-
-	strcat(send_buf, cfg.userinfo_filename);
-	pos += strlen(cfg.userinfo_filename);
-	send_buf[pos] = '|';
-	pos++;
-	send_buf[pos] = '\0';
-
-	strcat(send_buf, cfg.usersessions_filename);
-	pos += strlen(cfg.usersessions_filename);
-	send_buf[pos] = '\n';
-	send_buf[pos+1] = '\0';
-	
-	int data_size = pos+1;
-	int wc = write(serv->db_sock, send_buf, data_size);
-	
-	//////////////////////////////////////////////////////////////////////////////////
-	alarm(TIMER_VALUE);
-	
-	char read_buf[BUFFER_SIZE];
-	int rc = read(serv->db_sock, read_buf, sizeof(read_buf));
-	
-	alarm( 0 );
-	//////////////////////////////////////////////////////////////////////////////////
-
-	if ( rc < 1 )
+	printf("[%s] %s Sending configuration data to database server...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	if ( !send_config_data_to_db(&cfg) )
 	{
-		fprintf(stderr, "[%s] %s Database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		
 		if ( serv )
 		{
 			if ( serv->sess_array )
 				free(serv->sess_array);
 			free(serv);
 		}
-
-		return 0;
-	}
-	
-	if ( rc < BUFFER_SIZE )
-	{
-		if ( read_buf[rc-1] == '\n' )
-			read_buf[rc-1] = '\0';
-	}
-	else
-	{
-		read_buf[BUFFER_SIZE-1] = '\0';
-	}
-	
-	if ( strcmp("DB_INITIALIZATION_SUCCESS", read_buf) != 0 )
-	{
-		fprintf(stderr, "[%s] %s Database server unable to initialize himself.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		
-		if ( serv )
-		{
-			if ( serv->sess_array )
-				free(serv->sess_array);
-			free(serv);
-		}
+		sl_clear(&clients_online);
 
 		return 0;
 	}
-	printf("[%s] %s Database server successfully initialized.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	printf("[%s] %s Database server has successfully configured.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	
 
 	printf("[%s] %s Waiting for connections..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
@@ -1073,23 +1080,23 @@ static int server_accept_client(void)
 	/* printf("client_sock = %d\n", client_sock); */
 	if ( client_sock >= serv->sess_array_size )
 	{
-		int newlen = serv->sess_array_size;
-		while ( client_sock >= newlen )
-			newlen += serv->sess_array_size;
+		int newlen = serv->sess_array_size + serv->sess_array_size;
 
 		serv->sess_array = realloc(serv->sess_array, newlen * sizeof(ClientSession*));
 		if ( !serv->sess_array )
 		{
 			fprintf(stderr, "[%s] %s memory error in \"serv\" struct records!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 
-			if (serv)
+			if ( serv )
 				free(serv);
 
-			return -1;
+			sl_clear(&clients_online);
+
+			return -2;
 		}
 
 		int i;
-		for (i = serv->sess_array_size; i < newlen; i++)
+		for ( i = serv->sess_array_size; i < newlen; i++ )
 			serv->sess_array[i] = NULL;
 		serv->sess_array_size = newlen;
 		
@@ -1103,12 +1110,37 @@ static int server_accept_client(void)
 		
 		if ( !write_configuration_file(&cfg) )
 		{
-			return -1;
+			if ( serv )
+			{
+				if ( serv->sess_array )
+					free(serv->sess_array);
+				free(serv);
+			}
+			
+			sl_clear(&clients_online);
+			
+			fprintf(stderr, "[%s] %s Unable to write data in configuration file \"%s\"\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
+
+			return -2;
 		}
 		printf("[%s] %s Configuration file \"%s\" has been updated!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, CONFIG_NAME);
 
-		init_userinfo_database(newlen, 1);
-		init_ext_userinfo_database(newlen, 1);
+		if ( !send_config_data_to_db(&cfg) )
+		{
+			if ( serv )
+			{
+				if ( serv->sess_array )
+					free(serv->sess_array);
+				free(serv);
+			}
+			
+			sl_clear(&clients_online);
+
+			fprintf(stderr, "[%s] %s Unable to send config data to remote peer\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+
+			return -2;
+		}
+		printf("[%s] %s Database server records has successfully updated.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	}
 
 	serv->sess_array[client_sock] = make_new_session(client_sock, &addr);
@@ -1200,7 +1232,8 @@ int server_running(void)
 		}
 
 		if ( FD_ISSET(serv->ls, &readfds) )
-			server_accept_client();
+			if ( server_accept_client() == -2 )
+				break;
 
 		for ( i = 0; i < serv->sess_array_size; i++ )
 			if ( serv->sess_array[i] && FD_ISSET(i, &readfds) )

@@ -139,7 +139,6 @@ char** parse_ops_file(int* strings_count)
 	return ops_strings;
 }
 
-
 char** parse_configuration_file(int* strings_count)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
