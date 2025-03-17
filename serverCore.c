@@ -26,13 +26,39 @@ static int session_do_read(ClientSession* sess);
 static int send_config_data_to_db(const ConfigFields* cfg);
 static int server_accept_client(void);
 
+
 StringList* clients_online = NULL;
 Server* serv = NULL;
 
 static int exit_flag = 0;
 static int sig_number = 0;
 
-enum { TIMER_VALUE			=			10 };
+enum 
+{				TIMER_VALUE			=			10,
+				TOKENS_NUM			=			16
+};
+
+/*A format of parsed table record from server database */
+enum
+{
+				DB_LINE_EXIST,
+				ID,
+				USERNAME,
+				PASS,
+				RANK,
+				REALNAME,
+				AGE,
+				QUOTE,
+				MUTED,
+				START_MUTE_TIME,
+				MUTE_TIME,
+				MUTE_TIME_LEFT,
+				LAST_IP,
+				LAST_DATE_IN,
+				LAST_DATE_OUT,
+				REGISTRATION_DATE
+};
+
 
 void alrm_handler(int signo)
 {
@@ -213,11 +239,15 @@ static void session_handler_has_account(ClientSession* sess, const char* client_
 
 static void session_handler_login_wait_login(ClientSession* sess, const char* client_line)
 {
+	signal(SIGALRM, alrm_handler);
+
 	char cur_time[CURRENT_TIME_SIZE];
 
-	if ( (sess == NULL) || (client_line == NULL) )
+	if ( (sess == NULL) || (client_line == NULL) || (strcmp(client_line, "undefined") == 0) )
 	{
-		fprintf(stderr, "[%s] %s In function \"session_handler_login_wait_login\" params \"sess\" or \"client_line\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s In function \"session_handler_login_wait_login\":\n"
+						"params \"sess\" or \"client_line\" is NULL OR\n"
+						"\"client_line\" is \"undefined\"\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return;
 	}
 	
@@ -232,17 +262,70 @@ static void session_handler_login_wait_login(ClientSession* sess, const char* cl
 		list = list->next;
 	}
 
-	/*
+	
 	char response_to_db[BUFFER_SIZE];
 	memset(response_to_db, 0, sizeof(response_to_db));
-	*/
+	strcpy(response_to_db, "DB_READLINE|");
+	strcat(response_to_db, client_line);
+	int len = strlen(response_to_db);
+	response_to_db[len] = '\n';
+	response_to_db[len+1] = '\0';
 
-	/* отправить команду READ client_line на сервер БД */
-	/* client_line - это логин клиента */
+	if ( serv->db_sock < 0 )
+	{
+		fprintf(stderr, "[%s] %s In function \"session_handler_login_wait_login\" database socket is less than 0!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return;
+	}
+
+	int wc = write(serv->db_sock, response_to_db, len+1);
+	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len+1, SERVER_DB_ADDR, SERVER_DB_PORT);
+		
+	//////////////////////////////////////////////////////////////////////////////////
+	alarm(TIMER_VALUE);
 	
+	char read_buf[BUFFER_SIZE];
+	int rc = read(serv->db_sock, read_buf, sizeof(read_buf));
+	
+	alarm( 0 );
+	//////////////////////////////////////////////////////////////////////////////////
 
-	int index = get_record_index_by_name(client_line, DB_USERINFO_NAME);
-	if ( (index > -1) && (strcmp(client_line, "undefined") != 0) )
+	if ( rc < 1 )
+	{
+		fprintf(stderr, "[%s] %s Database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return;
+	}
+	
+	if ( rc < BUFFER_SIZE )
+	{
+		if ( read_buf[rc-1] == '\n' )
+			read_buf[rc-1] = '\0';
+	}
+	else
+	{
+		read_buf[BUFFER_SIZE-1] = '\0';
+	}
+	
+	if ( strcmp("DB_LINE_NOT_FOUND", read_buf) == 0 )
+	{
+		fprintf(stderr, "[%s] %s Database server unable to initialize himself.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);		
+		return;
+	}
+
+	char* parsed_options[TOKENS_NUM] = { NULL };
+	int i = 0;
+	char* istr = strtok(read_buf, "|");
+	while ( istr )
+	{
+		parsed_options[i] = istr;
+		i++;
+		if ( i >= TOKENS_NUM )
+			break;
+
+		istr = strtok(NULL, "|");
+	}
+	
+	int index = atoi(parsed_options[ID]);
+	if ( index > -1 )
 	{
 		memcpy(sess->login, client_line, strlen(client_line)+1);
 		session_send_string(sess, "*LOGIN_WAIT_PASS\n");

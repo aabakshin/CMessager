@@ -10,8 +10,8 @@ static const char* empty_field = "undefined";
 
 enum
 {
-	MAX_TOKENS_IN_MESSAGE			=		100,
-	WRITE_LINE_TOKENS				=		 15
+			MAX_TOKENS_IN_MESSAGE			=			100,
+			WRITE_LINE_TOKENS				=			 15
 };
 
 int db_get_new_record_index(const char* table_name)

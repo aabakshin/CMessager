@@ -283,7 +283,6 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 		int len_readline = strlen(readline);
 		strncat(send_buf, readline, len_readline);
 		len += len_readline;
-
 		send_buf[len] = '\0';
 
 		int wc = write(sess->data->fd, send_buf, len);

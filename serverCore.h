@@ -78,11 +78,17 @@ enum {
 
 enum
 {
-	FRESHMAN_RANK_VALUE			=			 1,
-	MEMBER_RANK_VALUE			=			 2,
-	WISDOM_RANK_VALUE			=			 3,
-	OLDMAN_RANK_VALUE			=			 4,
-	ADMIN_RANK_VALUE			=		   617
+		FRESHMAN_RANK_VALUE				=			 1,
+		MEMBER_RANK_VALUE				=			 2,
+		WISDOM_RANK_VALUE				=			 3,
+		OLDMAN_RANK_VALUE				=			 4,
+		ADMIN_RANK_VALUE				=		   617
+};
+
+enum
+{
+		DB_SERVER_IP_SIZE				=		   100,
+		DB_SERVER_PORT_SIZE				=		   100
 };
 
 typedef struct
