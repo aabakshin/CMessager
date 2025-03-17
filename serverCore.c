@@ -13,6 +13,8 @@
 
 static ClientSession* make_new_session(int sockfd, struct sockaddr_in *from);
 static void session_handler_has_account(ClientSession* sess, const char* client_line);
+static int read_query_from_db(char* read_buf, const char* client_line);
+static int check_user_in_db(const char* client_line);
 static void session_handler_login_wait_login(ClientSession* sess, const char* client_line);
 static void send_message_authorized(ClientSession* sess, const char* str);
 static void success_new_authorized(ClientSession* sess);
@@ -237,6 +239,91 @@ static void session_handler_has_account(ClientSession* sess, const char* client_
 	}
 }
 
+static int read_query_from_db(char* read_buf, const char* client_line)
+{
+	char cur_time[CURRENT_TIME_SIZE];
+
+	char response_to_db[BUFFER_SIZE];
+	memset(response_to_db, 0, sizeof(response_to_db));
+	strcpy(response_to_db, "DB_READLINE|");
+	strcat(response_to_db, client_line);
+	int len = strlen(response_to_db);
+	response_to_db[len] = '\n';
+	response_to_db[len+1] = '\0';
+
+	if ( serv->db_sock < 0 )
+	{
+		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" database socket is less than 0!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
+	int wc = write(serv->db_sock, response_to_db, len+1);
+	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len+1, SERVER_DB_ADDR, SERVER_DB_PORT);
+		
+	//////////////////////////////////////////////////////////////////////////////////
+	alarm(TIMER_VALUE);
+	
+	int rc = read(serv->db_sock, read_buf, sizeof(read_buf));
+	
+	alarm( 0 );
+	//////////////////////////////////////////////////////////////////////////////////
+
+	if ( rc < 1 )
+	{
+		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+	
+	if ( rc < BUFFER_SIZE )
+	{
+		if ( read_buf[rc-1] == '\n' )
+			read_buf[rc-1] = '\0';
+	}
+	else
+	{
+		read_buf[BUFFER_SIZE-1] = '\0';
+	}
+	
+	if ( strcmp("DB_LINE_NOT_FOUND", read_buf) == 0 )
+	{
+		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" unable to find record with key \"%s\" in database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, client_line);		
+		return -1;
+	}
+	
+	return 1;
+}
+
+static int check_user_in_db(const char* client_line)
+{
+	char read_buf[BUFFER_SIZE];
+	int rqfd_res = read_query_from_db(read_buf, client_line);
+	if ( rqfd_res != 1 )
+	{
+		if ( rqfd_res == 0 )
+		{
+			return -1;
+		}
+		return -1;
+	}
+
+	char* parsed_options[TOKENS_NUM] = { NULL };
+	int i = 0;
+	char* istr = strtok(read_buf, "|");
+	while ( istr )
+	{
+		parsed_options[i] = istr;
+		i++;
+		if ( i >= TOKENS_NUM )
+			break;
+
+		istr = strtok(NULL, "|");
+	}
+	
+	int index = atoi(parsed_options[ID]);
+
+	return index;
+}
+
 static void session_handler_login_wait_login(ClientSession* sess, const char* client_line)
 {
 	signal(SIGALRM, alrm_handler);
@@ -262,69 +349,7 @@ static void session_handler_login_wait_login(ClientSession* sess, const char* cl
 		list = list->next;
 	}
 
-	
-	char response_to_db[BUFFER_SIZE];
-	memset(response_to_db, 0, sizeof(response_to_db));
-	strcpy(response_to_db, "DB_READLINE|");
-	strcat(response_to_db, client_line);
-	int len = strlen(response_to_db);
-	response_to_db[len] = '\n';
-	response_to_db[len+1] = '\0';
-
-	if ( serv->db_sock < 0 )
-	{
-		fprintf(stderr, "[%s] %s In function \"session_handler_login_wait_login\" database socket is less than 0!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return;
-	}
-
-	int wc = write(serv->db_sock, response_to_db, len+1);
-	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len+1, SERVER_DB_ADDR, SERVER_DB_PORT);
-		
-	//////////////////////////////////////////////////////////////////////////////////
-	alarm(TIMER_VALUE);
-	
-	char read_buf[BUFFER_SIZE];
-	int rc = read(serv->db_sock, read_buf, sizeof(read_buf));
-	
-	alarm( 0 );
-	//////////////////////////////////////////////////////////////////////////////////
-
-	if ( rc < 1 )
-	{
-		fprintf(stderr, "[%s] %s Database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return;
-	}
-	
-	if ( rc < BUFFER_SIZE )
-	{
-		if ( read_buf[rc-1] == '\n' )
-			read_buf[rc-1] = '\0';
-	}
-	else
-	{
-		read_buf[BUFFER_SIZE-1] = '\0';
-	}
-	
-	if ( strcmp("DB_LINE_NOT_FOUND", read_buf) == 0 )
-	{
-		fprintf(stderr, "[%s] %s Database server unable to initialize himself.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);		
-		return;
-	}
-
-	char* parsed_options[TOKENS_NUM] = { NULL };
-	int i = 0;
-	char* istr = strtok(read_buf, "|");
-	while ( istr )
-	{
-		parsed_options[i] = istr;
-		i++;
-		if ( i >= TOKENS_NUM )
-			break;
-
-		istr = strtok(NULL, "|");
-	}
-	
-	int index = atoi(parsed_options[ID]);
+	int index = check_user_in_db(client_line);
 	if ( index > -1 )
 	{
 		memcpy(sess->login, client_line, strlen(client_line)+1);
@@ -424,20 +449,11 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 		list = list->next;
 	}
 	
-	FILE* dbusers = NULL;
-	if ( !(dbusers = fopen(DB_USERINFO_NAME, "rb")) )
-	{
-		fprintf(stderr, "[%s] %s Unable to open database file \"%s\". Is it exist?\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, DB_USERINFO_NAME);
-		session_send_string(sess, "*CANNOT_CONNECT_DATABASE\n");		
-		sess->state = fsm_error;
-		return;
-	}
-	
-	/* READ sess->login */
-	int index = get_record_index_by_name(sess->login, DB_USERINFO_NAME);
+
+	int index = check_user_in_db(sess->login);
 	if ( index < 0 )
 	{
-		fprintf(stderr, "[%s] %s Unable to find in database file \"%s\" user with \"%s\" name!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, DB_USERINFO_NAME, sess->login);
+		fprintf(stderr, "[%s] %s Unable to find in database table user with \"%s\" name!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sess->login);
 		session_send_string(sess, "*LOGIN_NOT_EXIST\n");
 		sess->state = fsm_error;
 		return;
