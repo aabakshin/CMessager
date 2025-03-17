@@ -85,12 +85,6 @@ enum
 		ADMIN_RANK_VALUE				=		   617
 };
 
-enum
-{
-		DB_SERVER_IP_SIZE				=		   100,
-		DB_SERVER_PORT_SIZE				=		   100
-};
-
 typedef struct
 {
 	int ls;
