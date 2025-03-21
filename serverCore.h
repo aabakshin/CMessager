@@ -11,6 +11,27 @@ enum
 	SECRET_NUMBER				=			 900
 };
 
+/*A format of parsed table record from server database */
+enum
+{
+				DB_LINE_EXIST,
+				ID,
+				USERNAME,
+				PASS,
+				RANK,
+				REALNAME,
+				AGE,
+				QUOTE,
+				MUTED,
+				START_MUTE_TIME,
+				MUTE_TIME,
+				MUTE_TIME_LEFT,
+				LAST_IP,
+				LAST_DATE_IN,
+				LAST_DATE_OUT,
+				REGISTRATION_DATE
+};
+
 enum fsm_states
 {
 	fsm_start,
@@ -96,6 +117,9 @@ typedef struct
 
 int is_valid_auth_str(const char *user_auth_str, int authentication);
 void session_send_string(ClientSession *sess, const char *str); 
+int read_query_from_db(char* read_buf, const char* client_line);
+int write_query_into_db(const char** strings_to_query);
+int get_field_from_db(char* field, const char* client_line, int field_code);
 int server_init(int port);
 void server_close_session(int sock_num);
 int server_running(void);                    

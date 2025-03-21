@@ -13,9 +13,6 @@
 
 static ClientSession* make_new_session(int sockfd, struct sockaddr_in *from);
 static void session_handler_has_account(ClientSession* sess, const char* client_line);
-static int read_query_from_db(char* read_buf, const char* client_line);
-static int write_query_into_db(const char** strings_to_query);
-static int get_field_from_db(char* field, const char* client_line, int field_code);
 static void session_handler_login_wait_login(ClientSession* sess, const char* client_line);
 static void send_message_authorized(ClientSession* sess, const char* str);
 static void success_new_authorized(ClientSession* sess);
@@ -39,27 +36,6 @@ static int sig_number = 0;
 enum 
 {				TIMER_VALUE			=			10,
 				TOKENS_NUM			=			16
-};
-
-/*A format of parsed table record from server database */
-enum
-{
-				DB_LINE_EXIST,
-				ID,
-				USERNAME,
-				PASS,
-				RANK,
-				REALNAME,
-				AGE,
-				QUOTE,
-				MUTED,
-				START_MUTE_TIME,
-				MUTE_TIME,
-				MUTE_TIME_LEFT,
-				LAST_IP,
-				LAST_DATE_IN,
-				LAST_DATE_OUT,
-				REGISTRATION_DATE
 };
 
 
@@ -237,7 +213,7 @@ static void session_handler_has_account(ClientSession* sess, const char* client_
 	}
 }
 
-static int read_query_from_db(char* read_buf, const char* client_line)
+int read_query_from_db(char* read_buf, const char* client_line)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 	
@@ -297,7 +273,7 @@ static int read_query_from_db(char* read_buf, const char* client_line)
 	return 1;
 }
 
-static int write_query_into_db(const char** strings_to_query)
+int write_query_into_db(const char** strings_to_query)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -367,7 +343,7 @@ static int write_query_into_db(const char** strings_to_query)
 	return 1;
 }
 
-static int get_field_from_db(char* field, const char* client_line, int field_code)
+int get_field_from_db(char* field, const char* client_line, int field_code)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -576,7 +552,13 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 			return;
 		}
 		
+		char rank[RANK_SIZE];
 		set_user_rank(sess);
+		rank[0] = get_user_rank(sess);
+		rank[1] = '\0';
+
+		if ( sess->muted )
+			eval_mute_time_left(sess);
 		
 		char smt[START_MUTE_TIME_SIZE];
 		if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
@@ -598,13 +580,6 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 			return;
 		}
 		sess->muted = atoi(muted);
-
-		if ( sess->muted )
-			eval_mute_time_left(sess);
-		
-		char rank[RANK_SIZE];
-		rank[0] = get_user_rank(sess);
-		rank[1] = '\0';
 		
 		char mtl[MUTE_TIME_LEFT_SIZE];
 		itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
