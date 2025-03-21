@@ -14,8 +14,8 @@
 static ClientSession* make_new_session(int sockfd, struct sockaddr_in *from);
 static void session_handler_has_account(ClientSession* sess, const char* client_line);
 static int read_query_from_db(char* read_buf, const char* client_line);
-static int get_user_id_from_db(const char* client_line);
-static int get_user_pass_from_db(char* user_pass, const char* client_line);
+static int write_query_into_db(const char** strings_to_query);
+static int get_field_from_db(char* field, const char* client_line, int field_code);
 static void session_handler_login_wait_login(ClientSession* sess, const char* client_line);
 static void send_message_authorized(ClientSession* sess, const char* str);
 static void success_new_authorized(ClientSession* sess);
@@ -110,9 +110,6 @@ int is_valid_auth_str(const char* user_auth_str, int authentication)
 	char* valid_symbols = ( !authentication ) ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_" : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_!?$#" ;
 	
 	int auth_str_len = strlen(user_auth_str);
-	
-	/*printf("auth_str_len = %d\n", auth_str_len);
-	printf("valid_symbols = %s\n", valid_symbols);*/
 
 	if ( !authentication )
 	{
@@ -243,6 +240,12 @@ static void session_handler_has_account(ClientSession* sess, const char* client_
 static int read_query_from_db(char* read_buf, const char* client_line)
 {
 	char cur_time[CURRENT_TIME_SIZE];
+	
+	if ( client_line == NULL )
+	{
+		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" \"client_line\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
 
 	char response_to_db[BUFFER_SIZE];
 	memset(response_to_db, 0, sizeof(response_to_db));
@@ -294,52 +297,89 @@ static int read_query_from_db(char* read_buf, const char* client_line)
 	return 1;
 }
 
-static int get_user_id_from_db(const char* client_line)
+static int write_query_into_db(const char** strings_to_query)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
-	if ( client_line == NULL )
+	if ( (strings_to_query == NULL) || (*strings_to_query == NULL) )
 	{
-		fprintf(stderr, "[%s] %s In function \"check_user_in_db\" \"client_line\" is NULL!", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return -1;
+		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" \"strings_to_query\" or \"*strings_to_query\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
 	}
 
-	char read_buf[BUFFER_SIZE];
-	int rqfd_res = read_query_from_db(read_buf, client_line);
-	if ( rqfd_res != 1 )
+	char response_to_db[BUFFER_SIZE];
+	memset(response_to_db, 0, sizeof(response_to_db));
+	
+	int i = 1;
+	int len = strlen(strings_to_query[0]);
+	strcpy(response_to_db, strings_to_query[0]);
+	while ( strings_to_query[i] != NULL )
 	{
-		if ( rqfd_res == 0 )
-		{
-			return -1;
-		}
-		return -1;
-	}
-
-	char* parsed_options[TOKENS_NUM] = { NULL };
-	int i = 0;
-	char* istr = strtok(read_buf, "|");
-	while ( istr )
-	{
-		parsed_options[i] = istr;
+		strcat(response_to_db, strings_to_query[i]);
+		len += strlen(strings_to_query[i]);
+		response_to_db[len] = '|';
+		len++;
+		response_to_db[len] = '\0';
 		i++;
-		if ( i >= TOKENS_NUM )
-			break;
+	}
+	response_to_db[len-1] = '\n';
 
-		istr = strtok(NULL, "|");
+	if ( serv->db_sock < 0 )
+	{
+		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" database socket is less than 0!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
+	int wc = write(serv->db_sock, response_to_db, len);
+	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, SERVER_DB_ADDR, SERVER_DB_PORT);
+		
+	//////////////////////////////////////////////////////////////////////////////////
+	alarm(TIMER_VALUE);
+	
+	char read_buf[BUFFER_SIZE];
+	int rc = read(serv->db_sock, read_buf, sizeof(read_buf));
+	
+	alarm( 0 );
+	//////////////////////////////////////////////////////////////////////////////////
+
+	if ( rc < 1 )
+	{
+		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
 	}
 	
-	int index = atoi(parsed_options[ID]);
+	if ( rc < BUFFER_SIZE )
+	{
+		if ( read_buf[rc-1] == '\n' )
+			read_buf[rc-1] = '\0';
+	}
+	else
+	{
+		read_buf[BUFFER_SIZE-1] = '\0';
+	}
+	
+	if ( strcmp("DB_LINE_WRITE_SUCCESS", read_buf) != 0 )
+	{
+		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);		
+		return 0;
+	}
 
-	return index;
+	return 1;
 }
 
-static int get_user_pass_from_db(char* user_pass, const char* client_line)
+static int get_field_from_db(char* field, const char* client_line, int field_code)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
-	if ( (client_line == NULL) || (user_pass == NULL) )
+	if ( (client_line == NULL) || (field == NULL) )
 	{
-		fprintf(stderr, "[%s] %s In function \"check_user_in_db\" \"client_line\" or \"user_pass\" is NULL!", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s In function \"get_field_from_db\" \"client_line\" or \"user_pass\" is NULL!", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+	
+	if ( (field_code < ID) || (field_code > REGISTRATION_DATE) )
+	{
+		fprintf(stderr, "[%s] %s In function \"get_field_from_db\" \"field_code\" has incorrect value!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
 
@@ -367,7 +407,7 @@ static int get_user_pass_from_db(char* user_pass, const char* client_line)
 		istr = strtok(NULL, "|");
 	}
 	
-	strcpy(user_pass, parsed_options[PASS]);
+	strcpy(field, parsed_options[field_code]);
 
 	return 1;
 }
@@ -396,8 +436,14 @@ static void session_handler_login_wait_login(ClientSession* sess, const char* cl
 		}
 		list = list->next;
 	}
+	
+	char id_param[100];
+	if ( !get_field_from_db(id_param, client_line, ID) )
+	{
+		return;
+	}
 
-	int index = get_user_id_from_db(client_line);
+	int index = atoi(id_param);
 	if ( index > -1 )
 	{
 		memcpy(sess->login, client_line, strlen(client_line)+1);
@@ -485,7 +531,6 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 	}
 
 	StringList* list = clients_online;
-
 	while ( list )
 	{
 		if ( strcmp(sess->login, list->data) == 0 )
@@ -497,8 +542,13 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 		list = list->next;
 	}
 	
+	char id_param[ID_SIZE];
+	if ( !get_field_from_db(id_param, sess->login, ID) )
+	{
+		return;
+	}
 
-	int index = get_user_id_from_db(sess->login);
+	int index = atoi(id_param);
 	if ( index < 0 )
 	{
 		fprintf(stderr, "[%s] %s Unable to find in database table user with \"%s\" name!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sess->login);
@@ -508,7 +558,7 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 	}
 	
 	char pass[PASS_SIZE];
-	if ( !get_user_pass_from_db(pass, sess->login) )
+	if ( !get_field_from_db(pass, sess->login, PASS) )
 	{
 		return;
 	}
@@ -516,31 +566,81 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 	if ( strcmp(client_line, pass) == 0 )
 	{
 		sess->ID = index;
-		memcpy(sess->pass, client_line, strlen(client_line)+1);
-	
-		char last_in[CURRENT_DATE_BUF_SIZE];
-		get_date_str(last_in, CURRENT_DATE_BUF_SIZE);
-		memcpy(sess->last_date_in, last_in, strlen(last_in)+1);
 
-		memcpy(sess->registration_date, xrecord->registration_date, strlen(xrecord->registration_date)+1);
+		memcpy(sess->pass, client_line, strlen(client_line)+1);
+
+		get_date_str(sess->last_date_in, CURRENT_DATE_BUF_SIZE);
+		
+		if ( !get_field_from_db(sess->registration_date, sess->login, REGISTRATION_DATE) )
+		{
+			return;
+		}
 		
 		set_user_rank(sess);
+		
+		char smt[START_MUTE_TIME_SIZE];
+		if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
+		{
+			return;
+		}
+		sess->start_mute_time = atoi(smt);
 
-		sess->start_mute_time = xrecord->start_mute_time;
-		sess->mute_time = xrecord->mute_time;
-		sess->muted = xrecord->muted;
+		char mt[MUTE_TIME_SIZE];
+		if ( !get_field_from_db(smt, sess->login, MUTE_TIME) )
+		{
+			return;
+		}
+		sess->mute_time = atoi(mt);
+
+		char muted[MUTED_SIZE];
+		if ( !get_field_from_db(smt, sess->login, MUTED) )
+		{
+			return;
+		}
+		sess->muted = atoi(muted);
 
 		if ( sess->muted )
 			eval_mute_time_left(sess);
-	
-		/* WRITE sess */
-		update_usersinfo_records(sess);
-		update_ext_usersinfo_records(sess);
+		
+		char rank[RANK_SIZE];
+		rank[0] = get_user_rank(sess);
+		rank[1] = '\0';
+		
+		char mtl[MUTE_TIME_LEFT_SIZE];
+		itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+
+		const char* query_strings[] = 
+		{
+						"DB_WRITELINE|",
+						sess->login,
+						"undefined",
+						rank,
+						"undefined",
+						"undefined",
+						"undefined",
+						"undefined",
+						"undefined",
+						"undefined",
+						mtl,
+						sess->last_ip,
+						sess->last_date_in,
+						"undefined",
+						"undefined",
+						NULL
+		};
+		
+		if ( !write_query_into_db(query_strings) )
+		{
+			return;
+		}
 		
 		sess->authorized = 1;
+
 		sess->user_status = status_online;
 		sl_insert(&clients_online, sess->login);
+
 		sess->state = fsm_wait_message;
+		
 		success_new_authorized(sess);
 
 		return;
@@ -561,8 +661,13 @@ static void session_handler_signup_wait_login(ClientSession* sess, const char* c
 
 	if ( is_valid_auth_str(client_line, 0) )
 	{
-		int index = get_record_index_by_name(client_line, DB_USERINFO_NAME);
+		char id_param[ID_SIZE];
+		if ( !get_field_from_db(id_param, client_line, ID) )
+		{
+			return;
+		}
 
+		int index = atoi(id_param);
 		if ( index > -1 )
 		{
 			session_send_string(sess, "*LOGIN_ALREADY_USED\n");
@@ -589,81 +694,66 @@ static void session_handler_signup_wait_pass(ClientSession* sess, const char* cl
 	}
 
 	if ( is_valid_auth_str(client_line, 1) )
-	{
-		int records_size = 0;
-		evaluate_size_databases(&records_size);
-		
-		FILE* dbusers = NULL;
-		if ( !(dbusers = fopen(DB_USERINFO_NAME, "rb")) )
-		{
-			fprintf(stderr, "[%s] %s Cannot open database file \"%s\". Is it exist?\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, DB_USERINFO_NAME);
-			session_send_string(sess, "*CANNOT_CONNECT_DATABASE\n");
-			sess->state = fsm_error;
-			return;
-		}
-
-		DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
-		if ( !record )
-		{
-			if ( dbusers )
-				fclose(dbusers);
-
-			fprintf(stderr, "[%s] %s In function \"session_handler_wait_pass\" memory error with \"record\"\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-			return;
-		}
-
-		int i;
-		for ( i = 0 ; i < records_size; i++ )
-		{
-			memset(record, 0, sizeof(DBUsersInformation));
-			fseek(dbusers, i * sizeof(DBUsersInformation), SEEK_SET);
-			fread(record, sizeof(DBUsersInformation), 1, dbusers);
-			
-			if ( strcmp(record->username, "undefined") == 0 )
-				break;
-		}
-		
-		if ( record )
-			free(record);
-
-		if ( dbusers )
-			fclose(dbusers);
-
-		int index = i;
-		if ( index == records_size ) 
-		{
-			fprintf(stderr, "[%s] %s Database file is full\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-			session_send_string(sess, "*CANNOT_CONNECT_DATABASE\n");
-			sess->state = fsm_error;
-			return;
-		}
-		
-		sess->ID = index;
-		
+	{	
 		memcpy(sess->pass, client_line, strlen(client_line)+1);
 	
-		char last_in[CURRENT_DATE_BUF_SIZE];
-		get_date_str(last_in, CURRENT_DATE_BUF_SIZE);
-		
-		memcpy(sess->last_date_in, last_in, strlen(last_in)+1);
-		memcpy(sess->registration_date, last_in, strlen(last_in)+1);
+		get_date_str(sess->last_date_in, CURRENT_DATE_BUF_SIZE);
+		get_date_str(sess->registration_date, CURRENT_DATE_BUF_SIZE);
 
 		set_user_rank(sess);
+		char rank[RANK_SIZE];
+		rank[0] = get_user_rank(sess);
+		rank[1] = '\0';
 
 		sess->muted = 0;
 		sess->start_mute_time = 0;
-		sess->mute_time_left = 0;
 		sess->mute_time = 0;
+		sess->mute_time_left = 0;
+		
+		char muted[MUTED_SIZE];
+		itoa(sess->muted, muted, MUTED_SIZE-1);
+	
+		char smt[START_MUTE_TIME_SIZE];
+		itoa(sess->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
+	
+		char mt[MUTE_TIME_SIZE];
+		itoa(sess->mute_time, mt, MUTE_TIME_SIZE-1);
 
-		update_usersinfo_records(sess);
-		update_ext_usersinfo_records(sess);
+		char mtl[MUTE_TIME_LEFT_SIZE];
+		itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+
+		const char* query_strings[] = 
+		{
+						"DB_WRITELINE|",
+						sess->login,
+						sess->pass,
+						rank,
+						"undefined",
+						"undefined",
+						"undefined",
+						muted,
+						smt,
+						mt,
+						mtl,
+						sess->last_ip,
+						sess->last_date_in,
+						"undefined",
+						sess->registration_date,
+						NULL
+		};
+		
+		if ( !write_query_into_db(query_strings) )
+		{
+			return;
+		}
 
 		sess->authorized = 1;
-		sess->user_status = status_online;
 
+		sess->user_status = status_online;
 		sl_insert(&clients_online, sess->login);
 		
 		sess->state = fsm_wait_message;
+
 		success_new_authorized(sess);
 
 		return;
@@ -1290,7 +1380,45 @@ void server_close_session(int sock_num)
 	if ( serv->sess_array[sock_num]->muted )
 		eval_mute_time_left(serv->sess_array[sock_num]);
 
-	update_ext_usersinfo_records(serv->sess_array[sock_num]);
+	char muted[MUTED_SIZE];
+	itoa(serv->sess_array[sock_num]->muted, muted, MUTED_SIZE-1);
+
+	char smt[START_MUTE_TIME_SIZE];
+	itoa(serv->sess_array[sock_num]->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
+
+	char mt[MUTE_TIME_SIZE];
+	itoa(serv->sess_array[sock_num]->mute_time, mt, MUTE_TIME_SIZE-1);
+
+	char mtl[MUTE_TIME_LEFT_SIZE];
+	itoa(serv->sess_array[sock_num]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+	
+	char last_date_out[CURRENT_DATE_BUF_SIZE];
+	get_date_str(last_date_out, CURRENT_DATE_BUF_SIZE);
+
+	const char* query_strings[] = 
+	{
+					"DB_WRITELINE|",
+					serv->sess_array[sock_num]->login,
+					"undefined",
+					"undefined",
+					"undefined",
+					"undefined",
+					"undefined",
+					muted,
+					smt,
+					mt,
+					mtl,
+					"undefined",
+					"undefined",
+					last_date_out,
+					"undefined",
+					NULL
+	};
+	
+	if ( !write_query_into_db(query_strings) )
+	{
+		return;
+	}
 
 	if ( clients_online )
 		sl_remove(&clients_online, serv->sess_array[sock_num]->login);

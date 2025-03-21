@@ -45,7 +45,7 @@ typedef struct
 	char pass[PASS_SIZE];
 	char last_ip[LAST_IP_SIZE];
 	char last_date_in[LAST_DATE_IN_SIZE];
-	char registration_date[REGISTRATION_DATE_SIZE];
+	char registration_date[REG_DATE_SIZE];
 	int rank;
 	int authorized;
 	enum status user_status;

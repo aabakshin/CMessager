@@ -312,7 +312,10 @@ void set_user_rank(ClientSession *sess)
 	for ( j = 0; j < ops_count; j++ )
 	{
 		if ( strcmp(sess->login, ops_strings[j]) == 0 )
+		{
+			sess->rank = ADMIN_RANK_VALUE;
 			is_op = 1;
+		}
 
 		free(ops_strings[j]);
 		ops_strings[j] = NULL;
@@ -322,20 +325,19 @@ void set_user_rank(ClientSession *sess)
 
 	if ( is_op )
 	{
-		sess->rank = ADMIN_RANK_VALUE;
+		return;
 	}
+	
+	unsigned long long time_user_exist = get_date_num(sess->last_date_in) - get_date_num(sess->registration_date);
+	if ( time_user_exist < 7*86400 )
+		sess->rank = FRESHMAN_RANK_VALUE;
+	else if ( (time_user_exist >= 7*86400) && (time_user_exist < 30*86400) )
+		sess->rank = MEMBER_RANK_VALUE;
+	else if ( (time_user_exist >= 30*86400) && (time_user_exist < 365*86400) )
+		sess->rank = WISDOM_RANK_VALUE;
 	else
-	{
-		unsigned long long time_user_exist = get_date_num(sess->last_date_in) - get_date_num(sess->registration_date);
-		if ( time_user_exist < 7*86400 )
-			sess->rank = FRESHMAN_RANK_VALUE;
-		else if ( (time_user_exist >= 7*86400) && (time_user_exist < 30*86400) )
-			sess->rank = MEMBER_RANK_VALUE;
-		else if ( (time_user_exist >= 30*86400) && (time_user_exist < 365*86400) )
-			sess->rank = WISDOM_RANK_VALUE;
-		else
-			sess->rank = OLDMAN_RANK_VALUE;
-	}
+		sess->rank = OLDMAN_RANK_VALUE;
+	
 }
 
 char get_user_rank(ClientSession *sess)
@@ -1065,10 +1067,10 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 		return NULL;
 	}
 
-	char buffer_username[USERNAME_STR_SIZE]				=			{ 0 };
+	char buffer_username[LOGIN_SIZE]					=			{ 0 };
 	char buffer_age[AGE_STR_SIZE]						=			{ 0 };
-	char buffer_realname[REALNAME_STR_SIZE]				=			{ 0 };
-	char buffer_quote[QUOTE_STR_SIZE]					=			{ 0 };
+	char buffer_realname[REALNAME_SIZE]					=			{ 0 };
+	char buffer_quote[QUOTE_SIZE]						=			{ 0 };
 	ResponseRecord* response_struct = NULL;
 
 
@@ -1224,9 +1226,9 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 	
 
 	memcpy(response_struct->age, buffer_age, AGE_STR_SIZE);
-	memcpy(response_struct->quote, buffer_quote, QUOTE_STR_SIZE);
-	memcpy(response_struct->realname, buffer_realname, REALNAME_STR_SIZE);
-	memcpy(response_struct->username, buffer_username, USERNAME_STR_SIZE);
+	memcpy(response_struct->quote, buffer_quote, QUOTE_SIZE);
+	memcpy(response_struct->realname, buffer_realname, REALNAME_SIZE);
+	memcpy(response_struct->username, buffer_username, LOGIN_SIZE);
 	
 	if ( show_record_flag )
 	{
