@@ -293,7 +293,7 @@ void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		
 		char rank[RANK_SIZE];
 		set_user_rank(sess);
-		rank[0] = get_user_rank(sess);
+		rank[0] = get_user_rank(sess->rank);
 		rank[1] = '\0';
 
 		if ( sess->muted )
@@ -343,6 +343,27 @@ void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	session_send_string(sess, "*CHGPWD_COMMAND_INCORRECT_PASS\n");
 }
 
+int eval_rank_num(const char* last_date_in, const char* registration_date)
+{
+	if ( (last_date_in == NULL) || (registration_date == NULL) )
+	{
+		return -1;
+	}
+
+	unsigned long long time_user_exist = get_date_num(last_date_in) - get_date_num(registration_date);
+	
+	if ( time_user_exist < 7*86400 )
+		return FRESHMAN_RANK_VALUE;
+	
+	if ( (time_user_exist >= 7*86400) && (time_user_exist < 30*86400) )
+		return MEMBER_RANK_VALUE;
+
+	if ( (time_user_exist >= 30*86400) && (time_user_exist < 365*86400) )
+		return WISDOM_RANK_VALUE;
+
+	return OLDMAN_RANK_VALUE;
+}
+
 void set_user_rank(ClientSession *sess)
 {
 	if ( sess == NULL )
@@ -374,24 +395,15 @@ void set_user_rank(ClientSession *sess)
 		return;
 	}
 	
-	unsigned long long time_user_exist = get_date_num(sess->last_date_in) - get_date_num(sess->registration_date);
-	if ( time_user_exist < 7*86400 )
-		sess->rank = FRESHMAN_RANK_VALUE;
-	else if ( (time_user_exist >= 7*86400) && (time_user_exist < 30*86400) )
-		sess->rank = MEMBER_RANK_VALUE;
-	else if ( (time_user_exist >= 30*86400) && (time_user_exist < 365*86400) )
-		sess->rank = WISDOM_RANK_VALUE;
-	else
-		sess->rank = OLDMAN_RANK_VALUE;
-	
+	sess->rank = eval_rank_num(sess->last_date_in, sess->registration_date);
 }
 
-char get_user_rank(ClientSession *sess)
+char get_user_rank(int rank)
 {
-	if ( sess == NULL )
-		return '\0';
-	
-	switch ( sess->rank )
+	if ( (rank < FRESHMAN_RANK_VALUE) || (rank > ADMIN_RANK_VALUE) )
+		return 'u';
+
+	switch ( rank )
 	{
 		case FRESHMAN_RANK_VALUE:
 			return 'F';
@@ -411,7 +423,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 {
 	char cur_time[CUR_TIME_SIZE];
 
-	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
+	if ( (sess == NULL) || (cmd_args == NULL) )
 		return;
 
 	if ( args_num != 2 )
@@ -474,7 +486,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			serv->sess_array[i]->rank = ADMIN_RANK_VALUE;
 
 			char rank[RANK_SIZE];
-			rank[0] = get_user_rank(serv->sess_array[i]);
+			rank[0] = get_user_rank(serv->sess_array[i]->rank);
 			rank[1] = '\0';
 
 			if ( serv->sess_array[i]->muted )
@@ -613,15 +625,12 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	else
 		ops_strings = malloc( sizeof(char*) * ( strings_count + 1 ) );
 
-	int str_len = 0;
-	int i;
-	for (i = 0; buffer_username[i]; i++)
-		str_len++;
-
-	ops_strings[strings_count] = malloc( sizeof(char) * str_len + 1 );
-	memcpy(ops_strings[strings_count], buffer_username, str_len + 1);
+	int user_len = strlen(buffer_username);
+	ops_strings[strings_count] = malloc( sizeof(char) * user_len + 1 );
+	memcpy(ops_strings[strings_count], buffer_username, user_len + 1);
 	strings_count++;
-
+	
+	int i;
 	for (i = 0; i < strings_count; i++)
 	{
 		fprintf(dbops, "%s\n", ops_strings[i]);
@@ -645,7 +654,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 {
 	char cur_time[CUR_TIME_SIZE];
 
-	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
+	if ( (sess == NULL) || (cmd_args == NULL) )
 		return;
 
 	if ( args_num != 2 )
@@ -669,6 +678,8 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	}
 
 
+
+	/* удаляем пользователя из списка админов в файле ops.txt и перезаписываем этот файл */
 	char** ops_strings = NULL;
 	int strings_count = 0;
 	
@@ -757,8 +768,10 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	
 	if ( dbops )
 		fclose(dbops);
+	/* удаляем пользователя из списка админов в файле ops.txt и перезаписываем этот файл */
 
 	
+
 	char id_param[ID_SIZE];
 	if ( !get_field_from_db(id_param, buffer_username, ID) )
 	{
@@ -800,30 +813,121 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		else
 		{
 			set_user_rank(serv->sess_array[i]);
-			update_usersinfo_records(serv->sess_array[i]);
+
+			char rank[RANK_SIZE];
+			rank[0] = get_user_rank(serv->sess_array[i]->rank);
+			rank[1] = '\0';
+
+			if ( serv->sess_array[i]->muted )
+				eval_mute_time_left(serv->sess_array[i]);
+		
+			char smt[START_MUTE_TIME_SIZE];
+			if ( !get_field_from_db(smt, serv->sess_array[i]->login, START_MUTE_TIME) )
+			{
+				return;
+			}
+			serv->sess_array[i]->start_mute_time = atoi(smt);
+
+			char mt[MUTE_TIME_SIZE];
+			if ( !get_field_from_db(smt, serv->sess_array[i]->login, MUTE_TIME) )
+			{
+				return;
+			}
+			serv->sess_array[i]->mute_time = atoi(mt);
+
+			char muted[MUTED_SIZE];
+			if ( !get_field_from_db(smt, serv->sess_array[i]->login, MUTED) )
+			{
+				return;
+			}
+			serv->sess_array[i]->muted = atoi(muted);
+			
+			char mtl[MUTE_TIME_LEFT_SIZE];
+			itoa(serv->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+
+			const char* query_strings[] = 
+			{
+							"DB_WRITELINE|",
+							serv->sess_array[i]->login,
+							"undefined",
+							rank,
+							"undefined",
+							"undefined",
+							"undefined",
+							muted,
+							smt,
+							mtl,
+							mtl,
+							"undefined",
+							"undefined",
+							"undefined",
+							"undefined",
+							NULL
+			};
+			
+			if ( !write_query_into_db(query_strings) )
+			{
+				return;
+			}
 		}
 	}
 	else
 	{
-		if ( record->rank[0] != 'A' )
+		char rank[RANK_SIZE];
+		if ( !get_field_from_db(rank, buffer_username, RANK) )
+		{
+			return;
+		}
+
+		if ( rank[0] != 'A' )
 		{
 			session_send_string(sess, "*DEOP_COMMAND_USER_ALREADY_USER\n");
 			return;
 		}
 		else
 		{
-			unsigned long long time_user_exist = atoi(xrecord->last_date_in) - atoi(xrecord->registration_date);
-			if ( time_user_exist < 7*86400 )
-				record->rank[0] = 'F';
-			else if ( (time_user_exist >= 7*86400) && (time_user_exist < 30*86400) )
-				record->rank[0] = 'M';
-			else if ( (time_user_exist >= 30*86400) && (time_user_exist < 365*86400) )
-				record->rank[0] = 'W';
-			else
-				record->rank[0] = 'O';			
-		}
+			char ldi[LAST_DATE_IN_SIZE];
+			if ( !get_field_from_db(ldi, buffer_username, LAST_DATE_IN) )
+			{
+				return;
+			}
+
+			char rd[REG_DATE_SIZE];
+			if ( !get_field_from_db(rd, buffer_username, REGISTRATION_DATE) )
+			{
+				return;
+			}
+
+			int rank_num = eval_rank_num(ldi, rd);
+			rank[0] = get_user_rank(rank_num);
+
+			const char* query_strings[] = 
+			{
+							"DB_WRITELINE|",
+							buffer_username,
+							"undefined",
+							rank,
+							"undefined",
+							"undefined",
+							"undefined",
+							"undefined",
+							"undefined",
+							"undefined",
+							"undefined",
+							"undefined",
+							"undefined",
+							"undefined",
+							"undefined",
+							NULL
+			};
+			
+			if ( !write_query_into_db(query_strings) )
+			{
+				return;
+			}
+		}		
 	}
-	
+
 	session_send_string(sess, "*DEOP_COMMAND_SUCCESS\n");
 }
 
@@ -1659,7 +1763,7 @@ void record_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			
 			if ( is_correct_symbol )
 			{
-				if ( j < REALNAME_STR_SIZE )
+				if ( j < REALNAME_SIZE )
 				{
 					valid_param_flag = 1;
 					memcpy(record->realname, buffer_param_value, strlen(buffer_param_value)+1);
@@ -1706,7 +1810,7 @@ void record_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 			if ( is_correct_symbol )
 			{
-				if ( j < QUOTE_STR_SIZE )
+				if ( j < QUOTE_SIZE )
 				{
 					valid_param_flag = 1;
 					memcpy(record->quote, buffer_param_value, strlen(buffer_param_value)+1);

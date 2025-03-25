@@ -1,5 +1,3 @@
-/* Модуль serverCommands содержит функции-обработчики команд, а также некоторые вспомогательные функции для работы сервера */
-
 #ifndef SERVERCOMMANDS_H_SENTRY
 #define SERVERCOMMANDS_H_SENTRY
 
@@ -63,8 +61,9 @@ typedef struct
 } ResponseDebugRecord;
 
 
+int eval_rank_num(const char* last_date_in, const char* registration_date);
 void set_user_rank(ClientSession *sess);
-char get_user_rank(ClientSession *sess);
+char get_user_rank(int rank);
 void eval_mute_time_left(ClientSession *sess);
 void view_data(const char* str, int str_size, char mode, int line_length);
 int clear_cmd_args(char** cmd_args, int args_num);
