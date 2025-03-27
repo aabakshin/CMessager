@@ -117,9 +117,9 @@ typedef struct
 
 int is_valid_auth_str(const char *user_auth_str, int authentication);
 void session_send_string(ClientSession *sess, const char *str); 
-int read_query_from_db(char* read_buf, const char* client_line);
+int read_query_from_db(char* read_buf, const char* search_key);
 int write_query_into_db(const char** strings_to_query);
-int get_field_from_db(char* field, const char* client_line, int field_code);
+int get_field_from_db(char* field, const char* search_key, int field_code);
 int server_init(int port);
 void server_close_session(int sock_num);
 int server_running(void);                    

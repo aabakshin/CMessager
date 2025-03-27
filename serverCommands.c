@@ -132,7 +132,7 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 										"/help - list all valid commands",
 										"/whoih - list all online users",
 										"/changepassword <new_password> - set new password for account",
-										"/record [<\"username\"/realname/age/quote>] [<\"string\"/\"string\"/\"integer\"/\"string\">] - show user's personal card",
+										"/record [<\"username\"/realname/age/quote>] [<\"string\"/\"integer\"/\"string\">] - show user's personal card",
 										"/pm <user> <message> - send private message to user",
 										"/status [status_name/list] - Show your status or set status to your record/show list valid statuses",
 										NULL
@@ -1144,14 +1144,16 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 		return NULL;
 	}
 
-
+	/* возвращаемая в качестве результата запись */
 	ResponseRecord* response_struct = malloc(sizeof(ResponseRecord));
 	if ( !response_struct )
 	{
 		fprintf(stderr, "[%s] %s In function \"user_show_record\" memory error(\"response_struct\" is NULL)\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return NULL;
 	}
-	
+	memset(response_struct, 0, sizeof(ResponseRecord));
+
+
 	/* Проверка, существует ли запись с таким именем в таблице БД */
 	char response[BUFFER_SIZE];
 	if ( read_query_from_db(response, registered_username) == -1 )
@@ -1306,118 +1308,118 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 	}
 
 
-	int records_size = 0;
-	evaluate_size_databases(&records_size);
-	
-
-	FILE* dbusers = NULL;
-	if ( !(dbusers = fopen(DB_USERINFO_NAME, "rb")) )
-	{
-		fprintf(stderr, "[%s] %s Unable to open file \"%s\". Is it exist?\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE, DB_USERINFO_NAME);
-		return NULL;
-	}
-	
-	
-	ResponseDebugRecord* response_struct = malloc(sizeof(ResponseRecord));
+	ResponseDebugRecord* response_struct = malloc(sizeof(ResponseDebugRecord));
 	if ( !response_struct )
 	{
-		fprintf(stderr, "[%s] %s In function \"user_show_record\" memory error(\"response_struct\" is NULL)\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s In function \"debug_show_record\" memory error(\"response_struct\" is NULL)\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return NULL;
 	}
+	memset(response_struct, 0, sizeof(ResponseDebugRecord));
 
 
-	DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
-	if ( !record )
+	char response[BUFFER_SIZE];
+	if ( read_query_from_db(response, registered_username) == -1 )
 	{
-		fprintf(stderr, "[%s] %s In function \"user_show_record\" memory error.\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		if ( dbusers )
-			fclose(dbusers);
+		if ( response_struct )
+			free(response_struct);
 
-		return NULL;
-	}
-
-	int i;
-	for ( i = 0; i < records_size; i++ )
-	{
-		memset(record, 0, sizeof(DBUsersInformation));
-		fseek(dbusers, i * sizeof(DBUsersInformation), SEEK_SET);
-		fread(record, sizeof(DBUsersInformation), 1, dbusers);
-		
-		if ( strcmp(record->username, registered_username) == 0 )
-		{
-			const char* undef = "undefined";
-			const char* fresh = "FRESHMAN";
-			const char* member = "MEMBER";
-			const char* wisdom = "WISDOM";
-			const char* old = "OLD";
-			const char* admin = "ADMIN";
-			
-
-			int j;
-			switch ( record->rank[0] )
-			{
-				case 'u':
-					memcpy(response_struct->rank, undef, strlen(undef)+1);
-					break;
-				case 'F':
-					memcpy(response_struct->rank, fresh, strlen(fresh)+1);
-					break;
-				case 'M':
-					memcpy(response_struct->rank, member, strlen(member)+1);
-					break;
-				case 'W':
-					memcpy(response_struct->rank, wisdom, strlen(wisdom)+1);
-					break;
-				case 'O':
-					memcpy(response_struct->rank, old, strlen(old)+1);
-					break;
-				case 'A':
-					memcpy(response_struct->rank, admin, strlen(admin)+1);		
-			}
-			
-			
-			char buffer_username[LOGIN_SIZE] = { 0 };
-			const char* ends = "'s\"";
-			buffer_username[0] = '"';
-			
-			for ( j = 0, i = 1; registered_username[j]; j++, i++ )
-				buffer_username[i] = registered_username[j];
-			
-			for ( j = 0; ends[j]; j++, i++ )
-				buffer_username[i] = ends[j];
-			buffer_username[i] = '\0';
-			
-			memcpy(response_struct->username, buffer_username, strlen(buffer_username)+1);
-
-			break;
-		}
-	}
-	
-	if ( dbusers )
-		fclose(dbusers);
-
-	if ( record )
-		free(record);
-
-
-	if ( i >= records_size )
-	{
-		fprintf(stderr, "[%s] %s In function \"debug_show_record\" unable to find record in \"%s\" with \"%s\" name!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE, DB_USERINFO_NAME, registered_username);
+		fprintf(stderr, "[%s] %s In function \"debug_show_record\" unable to find record with \"%s\" name!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE, registered_username);
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 		return NULL;
 	}
-	
-	int index = i;
 
+
+	char rank[RANK_SIZE];
+	if ( !get_field_from_db(rank, registered_username, RANK) )
+	{
+		if ( response_struct )
+			free(response_struct);
+	
+		fprintf(stderr, "[%s] %s [1] In function \"debug_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+		return NULL;
+	}
+
+	switch ( rank[0] )
+	{
+		case 'u':
+			strcpy(response_struct->rank, "undefined");
+			break;
+		case 'F':
+			strcpy(response_struct->rank, "FRESHMAN");
+			break;
+		case 'M':
+			strcpy(response_struct->rank, "MEMBER");
+			break;
+		case 'W':
+			strcpy(response_struct->rank, "WISDOM");
+			break;
+		case 'O':
+			strcpy(response_struct->rank, "OLD");
+			break;
+		case 'A':
+			strcpy(response_struct->rank, "ADMIN");		
+	}
+			
+	
+	int i;
 	for ( i = 0; i < serv->sess_array_size; i++ )
 		if ( serv->sess_array[i] )
 			if ( serv->sess_array[i]->authorized )
 				if ( (strcmp(registered_username, serv->sess_array[i]->login) == 0) )
 				{
 					const char* status = get_status_str(serv->sess_array[i]->user_status);
-					memcpy(response_struct->status, status, strlen(status)+1);
+					strcpy(response_struct->status, status);
 					
-					index = i;
+					itoa(serv->sess_array[i]->ID, response_struct->id, ID_SIZE-1);
+					itoa(serv->sess_array[i]->authorized, response_struct->auth, AUTH_STR_SIZE-1);
+					itoa(serv->sess_array[i]->buf_used, response_struct->used, USED_STR_SIZE-1);
+
+					strcpy(response_struct->last_date_in, serv->sess_array[i]->last_date_in);
+					strcpy(response_struct->last_ip, serv->sess_array[i]->last_ip);
+					strcpy(response_struct->regdate, serv->sess_array[i]->registration_date);
+					strcpy(response_struct->pass, serv->sess_array[i]->pass);
+
+					itoa(serv->sess_array[i]->sockfd, response_struct->sock, SOCK_STR_SIZE-1);
+					itoa(serv->sess_array[i]->state, response_struct->state, STATE_STR_SIZE-1);
+					
+					eval_mute_time_left(serv->sess_array[i]);
+
+					itoa(serv->sess_array[i]->muted, response_struct->muted, MUTED_SIZE-1);
+					itoa(serv->sess_array[i]->mute_time, response_struct->mute_time, MUTE_TIME_SIZE-1);
+					itoa(serv->sess_array[i]->mute_time_left, response_struct->mute_time_left, MUTE_TIME_LEFT_SIZE-1);
+					itoa(serv->sess_array[i]->start_mute_time, response_struct->start_mute_time, START_MUTE_TIME_SIZE-1);
+					
+					char rank[RANK_SIZE];
+					set_user_rank(serv->sess_array[i]);
+					rank[0] = get_user_rank(serv->sess_array[i]->rank);
+					rank[1] = '\0';
+
+					const char* query_strings[] = 
+					{
+									"DB_WRITELINE|",
+									registered_username,
+									"undefined",
+									rank,
+									"undefined",
+									"undefined",
+									"undefined",
+									response_struct->muted,
+									response_struct->start_mute_time,
+									response_struct->mute_time,
+									response_struct->mute_time_left,
+									"undefined",
+									"undefined",
+									"undefined",
+									"undefined",
+									NULL
+					};
+					
+					if ( !write_query_into_db(query_strings) )
+					{
+						return NULL;
+					}
+			
 					break;
 				}
 
@@ -1425,25 +1427,31 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 	{
 		const char* offline = "offline";
 		memcpy(response_struct->status, offline, strlen(offline)+1);
+
+		if ( 
+				!get_field_from_db(response_struct->id, registered_username, ID)							||
+				!get_field_from_db(response_struct->last_date_in, registered_username, LAST_DATE_IN)		||
+				!get_field_from_db(response_struct->last_ip, registered_username, LAST_IP)					||
+				!get_field_from_db(response_struct->regdate, registered_username, REGISTRATION_DATE)		||
+				!get_field_from_db(response_struct->pass, registered_username, PASS)						||	
+				!get_field_from_db(response_struct->muted, registered_username, MUTED)						||
+				!get_field_from_db(response_struct->mute_time, registered_username, MUTE_TIME)				||
+				!get_field_from_db(response_struct->mute_time_left, registered_username, MUTE_TIME_LEFT)	||
+				!get_field_from_db(response_struct->start_mute_time, registered_username, START_MUTE_TIME)
+		   )
+		{
+			if ( response_struct )
+				free(response_struct);
+		
+			fprintf(stderr, "[%s] %s [2] In function \"debug_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
+			session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+			return NULL;
+		}
+		
+		response_struct->auth[0] = '0';
+		response_struct->auth[1] = '\0';
 	}
 
-	itoa(serv->sess_array[index]->ID, response_struct->id, ID_SIZE-1);
-	itoa(serv->sess_array[index]->authorized, response_struct->auth, AUTH_STR_SIZE-1);
-	itoa(serv->sess_array[index]->buf_used, response_struct->used, USED_STR_SIZE-1);
-	memcpy(response_struct->last_date_in, serv->sess_array[index]->last_date_in, LAST_DATE_IN_SIZE);
-	memcpy(response_struct->last_ip, serv->sess_array[index]->last_ip, LAST_IP_SIZE);
-	memcpy(response_struct->regdate, serv->sess_array[index]->registration_date, REG_DATE_SIZE);
-	memcpy(response_struct->pass, serv->sess_array[index]->pass, PASS_SIZE);
-	itoa(serv->sess_array[index]->sockfd, response_struct->sock, SOCK_STR_SIZE-1);
-	itoa(serv->sess_array[index]->state, response_struct->state, STATE_STR_SIZE-1);
-
-	eval_mute_time_left(serv->sess_array[index]);
-	update_ext_usersinfo_records(serv->sess_array[index]);
-
-	itoa(serv->sess_array[index]->muted, response_struct->muted, MUTED_SIZE-1);
-	itoa(serv->sess_array[index]->mute_time, response_struct->mute_time, MUTE_TIME_SIZE-1);
-	itoa(serv->sess_array[index]->mute_time_left, response_struct->mute_time_left, MUTE_TIME_LEFT_SIZE-1);
-	itoa(serv->sess_array[index]->start_mute_time, response_struct->start_mute_time, START_MUTE_TIME_SIZE-1);
 
 	if ( show_record_flag )
 	{
@@ -1501,12 +1509,14 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 	if ( strcmp(type, "record") == 0 )
 	{
 		ResponseRecord* response = user_show_record(sess, username, 0);
-		const char* args_num = "10";
+		if ( !response )
+		{
+			return;
+		}
 		
-
 		const char* args[] = 
 		{
-				args_num,
+				"10",
 				response->username,
 				response->status,
 				response->rank,
@@ -1534,12 +1544,14 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 	else if ( strcmp(type, "debug") == 0 )
 	{
 		ResponseDebugRecord* response = debug_show_record(sess, username, 0);
-		const char* args_num = "20";
-
+		if ( !response )
+		{
+			return;
+		}
 		
 		const char* args[] = 
 		{
-				args_num,
+				"20",
 				response->username,
 				response->id,
 				response->auth,
@@ -1578,14 +1590,13 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 	session_send_string(sess, success_string);
 }
 
-void record_command_handler(ClientSession *sess, char **cmd_args, int args_num)
+void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 {
 	char cur_time[CUR_TIME_SIZE];
 
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
 		return;
 	
-
 	if ( args_num > 3 )
 	{	
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|TOO_MUCH_ARGS\n");
@@ -1618,50 +1629,36 @@ void record_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	}
 
 
-	int records_size = 0;
-	evaluate_size_databases(&records_size);
-
 
 	if ( args_num == 1 )
 	{
 		send_record_response(sess, sess->login, "record");
 	}
 	else if ( args_num == 2 )
-	{		
-		int index = get_record_index_by_name(buffer_param, DB_USERINFO_NAME);
-		if ( index != -1 )
-		{
-			FILE* dbusers = NULL;
-			if ( !(dbusers = fopen(DB_USERINFO_NAME, "rb")) )
-			{
-				fprintf(stderr, "[%s] %s Unable to open file \"%s\". Is it exist?\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, DB_USERINFO_NAME);
-				return;
-			}
-
-			DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
-			fseek(dbusers, index * sizeof(DBUsersInformation), SEEK_SET);
-			fread(record, sizeof(DBUsersInformation), 1, dbusers);
-			
-			if ( dbusers )
-				fclose(dbusers);
-
-			if ( record->rank[0] == 'A' )
-			{
-				if ( sess->rank != ADMIN_RANK_VALUE )
-				{
-					session_send_string(sess, "*COMMAND_NO_PERMS\n");
-					free(record);
-					return;
-				}
-			}
-
-			send_record_response(sess, buffer_param, "record");
-			free(record);
-		}
-		else
+	{	
+		char response[BUFFER_SIZE];
+		if ( read_query_from_db(response, buffer_param) == -1 )
 		{
 			session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+			return;
 		}
+		
+		char rank[RANK_SIZE];
+		if ( !get_field_from_db(rank, buffer_param, RANK))
+		{
+			return;
+		}
+		
+		if ( rank[0] == 'A' )
+		{
+			if ( sess->rank != ADMIN_RANK_VALUE )
+			{
+				session_send_string(sess, "*COMMAND_NO_PERMS\n");
+				return;
+			}
+		}
+
+		send_record_response(sess, buffer_param, "record");			
 	}
 	else if ( args_num == 3 )
 	{
@@ -1670,30 +1667,7 @@ void record_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		int valid_param_flag = 0;
 		int update_flag = 0;
 
-
-		int index = -1;
-		index = get_record_index_by_name(sess->login, DB_USERINFO_NAME);
-		if ( index == -1 )
-		{
-			fprintf(stderr, "[%s] %s In function \"record_command_handler\" unable to find record in \"%s\" with \"%s\" name!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE, DB_USERINFO_NAME, sess->login);
-			return;
-		}
-
-		FILE* dbusers = NULL;
-		if ( !(dbusers = fopen(DB_USERINFO_NAME, "rb")) )
-		{
-			fprintf(stderr, "[%s] %s Unable to open file \"%s\". Is it exist?\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE, DB_USERINFO_NAME);
-			return;
-		}
-		
-		
-		DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
-		memset(record, 0, sizeof(DBUsersInformation));
-		fseek(dbusers, index * sizeof(DBUsersInformation), SEEK_SET);
-		fread(record, sizeof(DBUsersInformation), 1, dbusers);
-		fclose(dbusers);
-		dbusers = NULL;
-
+		/* отправитель команды /record хочет получить расширенную информацию о другом пользователе(возможно и о себе) */
 		if ( (strcmp(buffer_param, valid_params[DEBUG]) == 0) )
 		{
 			if ( sess->rank != ADMIN_RANK_VALUE )
@@ -1702,15 +1676,22 @@ void record_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			}
 			else
 			{
-				if ( get_record_index_by_name(buffer_param_value, DB_USERINFO_NAME) != -1 )
-					send_record_response(sess, buffer_param_value, "debug");
-				else
+				char response[BUFFER_SIZE];
+				if ( read_query_from_db(response, buffer_param_value) == -1 )
+				{
 					session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+					return;
+				}
+
+				send_record_response(sess, buffer_param_value, "debug");
 			}
+
 			valid_param_flag = 1;
 		}
+		/* отправитель команды /record хочет изменить в своей записи поле REALNAME */
 		else if ( strcmp(buffer_param, valid_params[REALNAME]) == 0 )
 		{
+			/* проверка корректности нового значения поля REALNAME */
 			const char* valid_syms = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_";
 			int is_correct_symbol;
 
@@ -1731,33 +1712,148 @@ void record_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 					break;
 			}
 			
-			if ( is_correct_symbol )
+			/* обновляем данные по ключу sess->login в таблице БД, т.к пользователь изменил содержимое своей записи */
+			if ( is_correct_symbol && (j < REALNAME_SIZE) )
 			{
-				if ( j < REALNAME_SIZE )
-				{
-					valid_param_flag = 1;
-					memcpy(record->realname, buffer_param_value, strlen(buffer_param_value)+1);
-					update_flag = 1;
-				}
-			}
-		}
-		else if ( strcmp(buffer_param, valid_params[AGE]) == 0 )
-		{
-			int age = atoi(buffer_param_value);
-			if ( (age > MIN_AGE_VALUE) && (age < MAX_AGE_VALUE) )
-			{
-				record->age = age;
 				valid_param_flag = 1;
-			}
-			else
-			{
-				record->age = -1;
-			}
 
-			update_flag = 1;
+				set_user_rank(sess);
+
+				char rank[RANK_SIZE];
+				rank[0] = get_user_rank(sess->rank);
+				rank[1] = '\0';
+
+				if ( sess->muted )
+					eval_mute_time_left(sess);
+			
+				char smt[START_MUTE_TIME_SIZE];
+				if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
+				{
+					return;
+				}
+				sess->start_mute_time = atoi(smt);
+
+				char mt[MUTE_TIME_SIZE];
+				if ( !get_field_from_db(smt, sess->login, MUTE_TIME) )
+				{
+					return;
+				}
+				sess->mute_time = atoi(mt);
+
+				char muted[MUTED_SIZE];
+				if ( !get_field_from_db(smt, sess->login, MUTED) )
+				{
+					return;
+				}
+				sess->muted = atoi(muted);
+				
+				char mtl[MUTE_TIME_LEFT_SIZE];
+				itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+
+				const char* query_strings[] = 
+				{
+								"DB_WRITELINE|",
+								sess->login,
+								"undefined",
+								rank,
+								buffer_param_value,
+								"undefined",
+								"undefined",
+								muted,
+								smt,
+								mtl,
+								mtl,
+								"undefined",
+								"undefined",
+								"undefined",
+								"undefined",
+								NULL
+				};
+				
+				if ( !write_query_into_db(query_strings) )
+				{
+					return;
+				}
+				
+				/* Данные были успешно обновлены */
+			}
 		}
+		/* отправитель команды /record хочет изменить в своей записи поле AGE */
+		else if ( strcmp(buffer_param, valid_params[AGE]) == 0 )
+		{	
+			/* проверка корректности нового значения поля AGE */
+			int age = atoi(buffer_param_value);
+
+			/* обновляем данные по ключу sess->login в таблице БД, т.к пользователь изменил содержимое своей записи */
+			if ( (age >= MIN_AGE_VALUE) && (age <= MAX_AGE_VALUE) )
+			{
+				valid_param_flag = 1;
+
+				set_user_rank(sess);
+
+				char rank[RANK_SIZE];
+				rank[0] = get_user_rank(sess->rank);
+				rank[1] = '\0';
+
+				if ( sess->muted )
+					eval_mute_time_left(sess);
+			
+				char smt[START_MUTE_TIME_SIZE];
+				if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
+				{
+					return;
+				}
+				sess->start_mute_time = atoi(smt);
+
+				char mt[MUTE_TIME_SIZE];
+				if ( !get_field_from_db(smt, sess->login, MUTE_TIME) )
+				{
+					return;
+				}
+				sess->mute_time = atoi(mt);
+
+				char muted[MUTED_SIZE];
+				if ( !get_field_from_db(smt, sess->login, MUTED) )
+				{
+					return;
+				}
+				sess->muted = atoi(muted);
+				
+				char mtl[MUTE_TIME_LEFT_SIZE];
+				itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+
+				const char* query_strings[] = 
+				{
+								"DB_WRITELINE|",
+								sess->login,
+								"undefined",
+								rank,
+								"undefined",
+								buffer_param_value,
+								"undefined",
+								muted,
+								smt,
+								mtl,
+								mtl,
+								"undefined",
+								"undefined",
+								"undefined",
+								"undefined",
+								NULL
+				};
+				
+				if ( !write_query_into_db(query_strings) )
+				{
+					return;
+				}
+
+				/* Данные были успешно обновлены */
+			}
+		}
+		/* отправитель команды /record хочет изменить в своей записи поле QUOTE */
 		else if ( strcmp(buffer_param, valid_params[QUOTE]) == 0 )
 		{
+			/* проверка корректности нового значения поля QUOTE */
 			const char* valid_syms = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_";
 			int is_correct_symbol;
 
@@ -1777,42 +1873,76 @@ void record_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 				if ( !is_correct_symbol )
 					break;
 			}
-
-			if ( is_correct_symbol )
+	
+			/* обновляем данные по ключу sess->login в таблице БД, т.к пользователь изменил содержимое своей записи */
+			if ( is_correct_symbol && (j < QUOTE_SIZE) )
 			{
-				if ( j < QUOTE_SIZE )
+				valid_param_flag = 1;
+
+				set_user_rank(sess);
+
+				char rank[RANK_SIZE];
+				rank[0] = get_user_rank(sess->rank);
+				rank[1] = '\0';
+
+				if ( sess->muted )
+					eval_mute_time_left(sess);
+			
+				char smt[START_MUTE_TIME_SIZE];
+				if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
 				{
-					valid_param_flag = 1;
-					memcpy(record->quote, buffer_param_value, strlen(buffer_param_value)+1);
-					update_flag = 1;
+					return;
 				}
+				sess->start_mute_time = atoi(smt);
+
+				char mt[MUTE_TIME_SIZE];
+				if ( !get_field_from_db(smt, sess->login, MUTE_TIME) )
+				{
+					return;
+				}
+				sess->mute_time = atoi(mt);
+
+				char muted[MUTED_SIZE];
+				if ( !get_field_from_db(smt, sess->login, MUTED) )
+				{
+					return;
+				}
+				sess->muted = atoi(muted);
+				
+				char mtl[MUTE_TIME_LEFT_SIZE];
+				itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+
+				const char* query_strings[] = 
+				{
+								"DB_WRITELINE|",
+								sess->login,
+								"undefined",
+								rank,
+								"undefined",
+								"undefined",
+								buffer_param_value,
+								muted,
+								smt,
+								mtl,
+								mtl,
+								"undefined",
+								"undefined",
+								"undefined",
+								"undefined",
+								NULL
+				};
+				
+				if ( !write_query_into_db(query_strings) )
+				{
+					return;
+				}
+
+				/* Данные были успешно обновлены */
 			}
 		}
 			
-
 		if ( !valid_param_flag )
 			session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|INCORRECT_STRING_VALUE\n");
-		
-		if ( update_flag )
-		{
-			if ( !(dbusers = fopen(DB_USERINFO_NAME, "rb+")) )
-			{
-				fprintf(stderr, "[%s] %s Unable to open file \"%s\". Is it exist?\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE, DB_USERINFO_NAME);
-				session_send_string(sess, "*CANNOT_CONNECT_DATABASE\n");
-				
-				if ( record )
-					free(record);
-			}
-
-			fseek(dbusers, index * sizeof(DBUsersInformation), SEEK_SET);
-			fwrite(record, sizeof(DBUsersInformation), 1, dbusers);
-			
-			if ( dbusers )
-				fclose(dbusers);
-		}
-
-		if ( record )
-			free(record);
 	}
 }
 
@@ -2009,7 +2139,7 @@ void mute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		return;
 	}
 	
-	char time_val[START_MUTE_TIME_STR_SIZE];
+	char time_val[START_MUTE_TIME_SIZE];
 	memcpy(time_val, cmd_args[2], strlen(cmd_args[2]) + 1);
 
 	int mute_time = atoi(time_val);
@@ -2073,7 +2203,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	}
 
 
-	char username_buf[USERNAME_STR_SIZE];
+	char username_buf[LOGIN_SIZE];
 	memcpy(username_buf, cmd_args[1], strlen(cmd_args[1])+1);
 	
 
@@ -2165,8 +2295,6 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
 		return;
 
-	StringList* users_list = clients_online;
-
 	if ( args_num != 2 )
 	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|KICK|TOO_MUCH_ARGS\n");
@@ -2179,30 +2307,16 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		return;
 	}
 
-	
-	char username_buf[USERNAME_STR_SIZE];
+	char username_buf[LOGIN_SIZE];
 	memcpy(username_buf, cmd_args[1], strlen(cmd_args[1])+1);
 	
-
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"kick_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 		cmd_args = NULL;
 	}
 	
-	if ( !is_valid_auth_str(username_buf, 0) )
-	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|KICK|INCORRECT_USERNAME\n");
-		return;
-	}
-	
-	int user_index = get_record_index_by_name(username_buf, DB_USERINFO_NAME);
-	if ( user_index == -1 )
-	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|KICK|USER_NOT_FOUND\n");
-		return;
-	}
-	
+	StringList* users_list = clients_online;
 	int is_online = 0;
 	while ( users_list )
 	{
@@ -2399,8 +2513,8 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 			if ( db_non_empty_idxs[i] > -1 )
 			{
-				char buf_id[ID_STR_SIZE];
-				itoa(record->ID, buf_id, ID_STR_SIZE-1);
+				char buf_id[ID_SIZE];
+				itoa(record->ID, buf_id, ID_SIZE-1);
 				
 				enum { ARGS = 4 };
 				const char* args[ARGS] = 

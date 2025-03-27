@@ -213,11 +213,11 @@ static void session_handler_has_account(ClientSession* sess, const char* client_
 	}
 }
 
-int read_query_from_db(char* read_buf, const char* client_line)
+int read_query_from_db(char* read_buf, const char* search_key)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 	
-	if ( client_line == NULL )
+	if ( search_key == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" \"client_line\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
@@ -226,7 +226,7 @@ int read_query_from_db(char* read_buf, const char* client_line)
 	char response_to_db[BUFFER_SIZE];
 	memset(response_to_db, 0, sizeof(response_to_db));
 	strcpy(response_to_db, "DB_READLINE|");
-	strcat(response_to_db, client_line);
+	strcat(response_to_db, search_key);
 	int len = strlen(response_to_db);
 	response_to_db[len] = '\n';
 	response_to_db[len+1] = '\0';
@@ -266,7 +266,7 @@ int read_query_from_db(char* read_buf, const char* client_line)
 	
 	if ( strcmp("DB_LINE_NOT_FOUND", read_buf) == 0 )
 	{
-		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" unable to find record with key \"%s\" in database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, client_line);		
+		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" unable to find record with key \"%s\" in database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, search_key);		
 		return -1;
 	}
 	
@@ -343,11 +343,11 @@ int write_query_into_db(const char** strings_to_query)
 	return 1;
 }
 
-int get_field_from_db(char* field, const char* client_line, int field_code)
+int get_field_from_db(char* field, const char* search_key, int field_code)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
-	if ( (client_line == NULL) || (field == NULL) )
+	if ( (search_key == NULL) || (field == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"get_field_from_db\" \"client_line\" or \"user_pass\" is NULL!", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
@@ -360,7 +360,7 @@ int get_field_from_db(char* field, const char* client_line, int field_code)
 	}
 
 	char read_buf[BUFFER_SIZE];
-	int rqfd_res = read_query_from_db(read_buf, client_line);
+	int rqfd_res = read_query_from_db(read_buf, search_key);
 	if ( rqfd_res != 1 )
 	{
 		if ( rqfd_res == 0 )
@@ -554,7 +554,7 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 		
 		char rank[RANK_SIZE];
 		set_user_rank(sess);
-		rank[0] = get_user_rank(sess);
+		rank[0] = get_user_rank(sess->rank);
 		rank[1] = '\0';
 
 		if ( sess->muted )
@@ -677,7 +677,7 @@ static void session_handler_signup_wait_pass(ClientSession* sess, const char* cl
 
 		set_user_rank(sess);
 		char rank[RANK_SIZE];
-		rank[0] = get_user_rank(sess);
+		rank[0] = get_user_rank(sess->rank);
 		rank[1] = '\0';
 
 		sess->muted = 0;
