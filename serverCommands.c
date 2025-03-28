@@ -500,14 +500,14 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			serv->sess_array[i]->start_mute_time = atoi(smt);
 
 			char mt[MUTE_TIME_SIZE];
-			if ( !get_field_from_db(smt, serv->sess_array[i]->login, MUTE_TIME) )
+			if ( !get_field_from_db(mt, serv->sess_array[i]->login, MUTE_TIME) )
 			{
 				return;
 			}
 			serv->sess_array[i]->mute_time = atoi(mt);
 
 			char muted[MUTED_SIZE];
-			if ( !get_field_from_db(smt, serv->sess_array[i]->login, MUTED) )
+			if ( !get_field_from_db(muted, serv->sess_array[i]->login, MUTED) )
 			{
 				return;
 			}
@@ -527,7 +527,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							"undefined",
 							muted,
 							smt,
-							mtl,
+							mt,
 							mtl,
 							"undefined",
 							"undefined",
@@ -668,6 +668,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		return;
 	}
 	
+
 	char buffer_username[100];
 	memcpy(buffer_username, cmd_args[1], strlen(cmd_args[1])+1);
 
@@ -676,7 +677,6 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"deop_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 		cmd_args = NULL;	
 	}
-
 
 
 	/* удаляем пользователя из списка админов в файле ops.txt и перезаписываем этот файл */
@@ -829,14 +829,14 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			serv->sess_array[i]->start_mute_time = atoi(smt);
 
 			char mt[MUTE_TIME_SIZE];
-			if ( !get_field_from_db(smt, serv->sess_array[i]->login, MUTE_TIME) )
+			if ( !get_field_from_db(mt, serv->sess_array[i]->login, MUTE_TIME) )
 			{
 				return;
 			}
 			serv->sess_array[i]->mute_time = atoi(mt);
 
 			char muted[MUTED_SIZE];
-			if ( !get_field_from_db(smt, serv->sess_array[i]->login, MUTED) )
+			if ( !get_field_from_db(muted, serv->sess_array[i]->login, MUTED) )
 			{
 				return;
 			}
@@ -856,7 +856,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							"undefined",
 							muted,
 							smt,
-							mtl,
+							mt,
 							mtl,
 							"undefined",
 							"undefined",
@@ -1608,6 +1608,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		return;
 	}
 	
+
 	char buffer_param[100];
 	char buffer_param_value[100];
 	if ( (args_num == 2) || (args_num == 3) )
@@ -1627,7 +1628,6 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"record_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 		cmd_args = NULL;
 	}
-
 
 
 	if ( args_num == 1 )
@@ -1734,14 +1734,14 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				sess->start_mute_time = atoi(smt);
 
 				char mt[MUTE_TIME_SIZE];
-				if ( !get_field_from_db(smt, sess->login, MUTE_TIME) )
+				if ( !get_field_from_db(mt, sess->login, MUTE_TIME) )
 				{
 					return;
 				}
 				sess->mute_time = atoi(mt);
 
 				char muted[MUTED_SIZE];
-				if ( !get_field_from_db(smt, sess->login, MUTED) )
+				if ( !get_field_from_db(muted, sess->login, MUTED) )
 				{
 					return;
 				}
@@ -1761,7 +1761,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								"undefined",
 								muted,
 								smt,
-								mtl,
+								mt,
 								mtl,
 								"undefined",
 								"undefined",
@@ -1806,14 +1806,14 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				sess->start_mute_time = atoi(smt);
 
 				char mt[MUTE_TIME_SIZE];
-				if ( !get_field_from_db(smt, sess->login, MUTE_TIME) )
+				if ( !get_field_from_db(mt, sess->login, MUTE_TIME) )
 				{
 					return;
 				}
 				sess->mute_time = atoi(mt);
 
 				char muted[MUTED_SIZE];
-				if ( !get_field_from_db(smt, sess->login, MUTED) )
+				if ( !get_field_from_db(muted, sess->login, MUTED) )
 				{
 					return;
 				}
@@ -1833,7 +1833,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								"undefined",
 								muted,
 								smt,
-								mtl,
+								mt,
 								mtl,
 								"undefined",
 								"undefined",
@@ -1896,14 +1896,14 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				sess->start_mute_time = atoi(smt);
 
 				char mt[MUTE_TIME_SIZE];
-				if ( !get_field_from_db(smt, sess->login, MUTE_TIME) )
+				if ( !get_field_from_db(mt, sess->login, MUTE_TIME) )
 				{
 					return;
 				}
 				sess->mute_time = atoi(mt);
 
 				char muted[MUTED_SIZE];
-				if ( !get_field_from_db(smt, sess->login, MUTED) )
+				if ( !get_field_from_db(muted, sess->login, MUTED) )
 				{
 					return;
 				}
@@ -1923,7 +1923,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								buffer_param_value,
 								muted,
 								smt,
-								mtl,
+								mt,
 								mtl,
 								"undefined",
 								"undefined",
@@ -1948,13 +1948,16 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 static void send_mute_response(ClientSession* sess, const char* username)
 {
-	const char* victim_message = "*MUTE_COMMAND_YOU_MUTED|";
-	char response_victim[100];
+	if ( (sess == NULL) || (username == NULL) || (username[0] == '\0') )
+	{
+		return;
+	}
 
-
-	int len = strlen(victim_message);
+	const char* msg_to_victim = "*MUTE_COMMAND_YOU_MUTED|";
+	char response_to_victim[100];
+	int len = strlen(msg_to_victim);
 	int pos = len;
-	memcpy(response_victim, victim_message, len+1);
+	memcpy(response_to_victim, msg_to_victim, len+1);
 	
 	int j;
 	for ( j = 0; j < serv->sess_array_size; j++ )
@@ -1969,12 +1972,12 @@ static void send_mute_response(ClientSession* sess, const char* username)
 	
 	int mt_len = strlen(mt);
 	pos += mt_len;
-	strncat(response_victim, mt, mt_len);
-	response_victim[pos] = '\n';
+	strncat(response_to_victim, mt, mt_len);
+	response_to_victim[pos] = '\n';
 	pos++;
-	response_victim[pos] = '\0';
+	response_to_victim[pos] = '\0';
 
-	session_send_string(serv->sess_array[index], response_victim);
+	session_send_string(serv->sess_array[index], response_to_victim);
 	
 
 
@@ -2021,15 +2024,13 @@ void eval_mute_time_left(ClientSession* sess)
 	}
 }
 
-void mute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
+void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 {
 	char cur_time[CUR_TIME_SIZE];
 
-	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
+	if ( (sess == NULL) || (cmd_args == NULL) )
 		return;
 	
-	StringList* users_list = clients_online;
-
 	if ( args_num != 3 )
 	{	
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|TOO_MUCH_ARGS\n");
@@ -2042,34 +2043,21 @@ void mute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		return;
 	}
 	
+
 	char username_buf[LOGIN_SIZE];
-	memcpy(username_buf, cmd_args[1], strlen(cmd_args[1])+1);
-
-	if ( !is_valid_auth_str(username_buf, 0) )
-	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|INCORRECT_USERNAME\n");
-
-		if ( !clear_cmd_args(cmd_args, args_num) )
-		{
-			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"mute_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
-			cmd_args = NULL;
-		}
-		return;
-	}
+	memcpy(username_buf, cmd_args[1], strlen(cmd_args[1]) + 1);
 	
-	int index = get_record_index_by_name(username_buf, DB_USERINFO_NAME);
-	if ( index == -1 )
-	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|USER_NOT_FOUND\n");
-		
-		if ( !clear_cmd_args(cmd_args, args_num) )
-		{
-			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"mute_command_handler\"[3]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
-			cmd_args = NULL;
-		}
-		return;
-	}
+	char time_val[START_MUTE_TIME_SIZE];
+	memcpy(time_val, cmd_args[2], strlen(cmd_args[2]) + 1);
 	
+	if ( !clear_cmd_args(cmd_args, args_num) )
+	{
+		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"mute_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
+		cmd_args = NULL;
+	}
+
+
+	StringList* users_list = clients_online;
 	int is_online = 0;
 	while ( users_list )
 	{
@@ -2078,12 +2066,6 @@ void mute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			if ( strcmp(username_buf, sess->login) == 0 )
 			{
 				session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|SELF_USE\n");
-			
-				if ( !clear_cmd_args(cmd_args, args_num) )
-				{
-					fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"mute_command_handler\"[4]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
-					cmd_args = NULL;
-				}
 				return;
 			}
 			else
@@ -2098,60 +2080,26 @@ void mute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	if ( !is_online )
 	{	
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|USER_OFFLINE\n");
-		if ( !clear_cmd_args(cmd_args, args_num) )
-		{
-			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"mute_command_handler\"[5]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
-			cmd_args = NULL;
-		}
 		return;
 	}
 	
-	FILE* dbxusers = NULL;
-	if ( !(dbxusers = fopen(DB_XUSERINFO_NAME, "rb")) )
-	{	
-		session_send_string(sess, "*CANNOT_CONNECT_DATABASE\n");
-		if ( !clear_cmd_args(cmd_args, args_num) )
-		{
-			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"mute_command_handler\"[6]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
-			cmd_args = NULL;
-		}
+	char muted[MUTED_SIZE];
+	if ( !get_field_from_db(muted, username_buf, MUTED) )
+	{
 		return;
 	}
 
-	DBXUsersInformation* record = malloc(sizeof(DBXUsersInformation));
-	fseek(dbxusers, index * sizeof(DBXUsersInformation), SEEK_SET);
-	fread(record, sizeof(DBXUsersInformation), 1, dbxusers);
-	
-	if ( dbxusers )
-		fclose(dbxusers);
-	
-	int is_muted = record->muted;
-	free(record);
-
+	int is_muted = atoi(muted);
 	if ( is_muted )
 	{	
 		session_send_string(sess, "*MUTE_COMMAND_USER_ALREADY_MUTED\n");
-		if ( !clear_cmd_args(cmd_args, args_num) )
-		{
-			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"mute_command_handler\"[7]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
-			cmd_args = NULL;
-		}
 		return;
 	}
-	
-	char time_val[START_MUTE_TIME_SIZE];
-	memcpy(time_val, cmd_args[2], strlen(cmd_args[2]) + 1);
 
 	int mute_time = atoi(time_val);
 	if ( (mute_time < MIN_MUTE_TIME_SEC) || (mute_time > MAX_MUTE_TIME_SEC) )
 	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|INCORRECT_TIME_RANGE\n");
-		
-		if ( !clear_cmd_args(cmd_args, args_num) )
-		{
-			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"mute_command_handler\"[8]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
-			cmd_args = NULL;
-		}
 		return;
 	}
 	
@@ -2168,16 +2116,50 @@ void mute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 				time_t t = time(0);
 				serv->sess_array[i]->start_mute_time = t;
 				
-				update_ext_usersinfo_records(serv->sess_array[i]);
+				char rank[RANK_SIZE];
+				set_user_rank(serv->sess_array[i]);
+				rank[0] = get_user_rank(serv->sess_array[i]->rank);
+				rank[1] = '\0';
+
+				itoa(serv->sess_array[i]->muted, muted, MUTED_SIZE-1);
+				
+				char smt[START_MUTE_TIME_SIZE];
+				itoa(serv->sess_array[i]->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
+				
+				char mt[MUTE_TIME_SIZE];
+				itoa(serv->sess_array[i]->mute_time, mt, MUTE_TIME_SIZE-1);
+				
+				char mtl[MUTE_TIME_LEFT_SIZE];
+				itoa(serv->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+
+				const char* query_strings[] = 
+				{
+								"DB_WRITELINE|",
+								username_buf,
+								"undefined",
+								rank,
+								"undefined",
+								"undefined",
+								"undefined",
+								muted,
+								smt,
+								mt,
+								mtl,
+								"undefined",
+								"undefined",
+								"undefined",
+								"undefined",
+								NULL
+				};
+				
+				if ( !write_query_into_db(query_strings) )
+				{
+					return;
+				}
+
 				break;
 			}
 		}
-	}
-	
-	if ( !clear_cmd_args(cmd_args, args_num) )
-	{
-		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"mute_command_handler\"[9]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
-		cmd_args = NULL;
 	}
 		
 	send_mute_response(sess, username_buf);
@@ -2187,7 +2169,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 {
 	char cur_time[CUR_TIME_SIZE];
 
-	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
+	if ( (sess == NULL) || (cmd_args == NULL) )
 		return;
 
 	if ( args_num != 2 )
@@ -2206,25 +2188,12 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	char username_buf[LOGIN_SIZE];
 	memcpy(username_buf, cmd_args[1], strlen(cmd_args[1])+1);
 	
-
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"unmute_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 		cmd_args = NULL;
 	}
 
-	if ( !is_valid_auth_str(username_buf, 0) )
-	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|UNMUTE|INCORRECT_USERNAME\n");
-		return;
-	}
-	
-	int user_index = get_record_index_by_name(username_buf, DB_USERINFO_NAME);
-	if ( user_index == -1 )
-	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|UNMUTE|USER_NOT_FOUND\n");
-		return;
-	}
 	
 	if ( strcmp(sess->login, username_buf) == 0 )
 	{
@@ -2232,21 +2201,13 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		return;
 	}
 	
-	FILE* dbxusers = NULL;
-	if ( !(dbxusers = fopen(DB_XUSERINFO_NAME, "rb")) )
-	{	
-		session_send_string(sess, "*CANNOT_CONNECT_DATABASE\n");
+	char muted[MUTED_SIZE];
+	if ( !get_field_from_db(muted, username_buf, MUTED) )
+	{
 		return;
 	}
-
-	DBXUsersInformation* record = malloc(sizeof(DBXUsersInformation));
-	fseek(dbxusers, user_index * sizeof(DBXUsersInformation), SEEK_SET);
-	fread(record, sizeof(DBXUsersInformation), 1, dbxusers);
-	fclose(dbxusers);
-
-	int is_muted = record->muted;
-	free(record);
-
+	
+	int is_muted = atoi(muted);
 	if ( !is_muted )
 	{	
 		session_send_string(sess, "*UNMUTE_COMMAND_USER_NOT_MUTED\n");
@@ -2264,7 +2225,47 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 				serv->sess_array[i]->mute_time = 0;
 				serv->sess_array[i]->mute_time_left = 0;
 				serv->sess_array[i]->start_mute_time = 0;
-				update_ext_usersinfo_records(serv->sess_array[i]);
+
+				char rank[RANK_SIZE];
+				set_user_rank(serv->sess_array[i]);
+				rank[0] = get_user_rank(serv->sess_array[i]->rank);
+				rank[1] = '\0';
+
+				itoa(serv->sess_array[i]->muted, muted, MUTED_SIZE-1);
+				
+				char smt[START_MUTE_TIME_SIZE];
+				itoa(serv->sess_array[i]->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
+				
+				char mt[MUTE_TIME_SIZE];
+				itoa(serv->sess_array[i]->mute_time, mt, MUTE_TIME_SIZE-1);
+				
+				char mtl[MUTE_TIME_LEFT_SIZE];
+				itoa(serv->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+
+				const char* query_strings[] = 
+				{
+								"DB_WRITELINE|",
+								username_buf,
+								"undefined",
+								rank,
+								"undefined",
+								"undefined",
+								"undefined",
+								muted,
+								smt,
+								mt,
+								mtl,
+								"undefined",
+								"undefined",
+								"undefined",
+								"undefined",
+								NULL
+				};
+				
+				if ( !write_query_into_db(query_strings) )
+				{
+					return;
+				}
 
 				session_send_string(serv->sess_array[i], "*UNMUTE_COMMAND_YOU_UNMUTED\n");
 				break;
@@ -2377,9 +2378,8 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 {	
 	char cur_time[CUR_TIME_SIZE];	
 
-	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
+	if ( (sess == NULL) || (cmd_args == NULL) )
 		return;
-
 
 	if ( args_num != 2 )
 	{
@@ -2390,9 +2390,11 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"table_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 			cmd_args = NULL;
 		}
+
 		return;
 	}
 	
+
 	char buffer_value[100];
 	memcpy(buffer_value, cmd_args[1], strlen(cmd_args[1]) + 1);
 
@@ -2402,14 +2404,38 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		cmd_args = NULL;
 	}
 
-	if ( strcmp(buffer_value, "list") == 0 )
+
+	ConfigFields cfg;
+	if ( !read_configuration_file(&cfg) )
 	{
-		session_send_string(sess, "*TABLE_COMMAND_SUCCESS|LIST|users_data.dat|users_sessions_info.dat\n");
 		return;
 	}
 
-	int is_userdata = (strcmp(buffer_value, DB_USERINFO_NAME) == 0) ? 1 : 0;
-	int is_session_userinfo = (strcmp(buffer_value, DB_XUSERINFO_NAME) == 0) ? 1 : 0;
+	if ( strcmp(buffer_value, "list") == 0 )
+	{
+		char answer[BUFFER_SIZE];
+		const char* table_cmd_success = "*TABLE_COMMAND_SUCCESS|LIST|";
+		int pos = strlen(table_cmd_success);
+		
+		strcpy(answer, table_cmd_success);
+		pos += strlen(cfg.userinfo_filename);
+
+		strcat(answer, cfg.userinfo_filename);
+		answer[pos] = '|';
+		pos++;
+		answer[pos] = '\0';
+
+		pos += strlen(cfg.usersessions_filename);
+		strcat(answer, cfg.usersessions_filename);
+		answer[pos] = '\n';
+		answer[pos+1] = '\0';
+
+		session_send_string(sess, answer);
+		return;
+	}
+
+	int is_userdata = (strcmp(buffer_value, cfg.userinfo_filename) == 0) ? 1 : 0;
+	int is_session_userinfo = (strcmp(buffer_value, cfg.usersessions_filename) == 0) ? 1 : 0;
 	
 	if ( (!is_userdata) && (!is_session_userinfo) )
 	{
@@ -2420,210 +2446,169 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	const char* resp_start = "*TABLE_COMMAND_SUCCESS|DATA|";
 	char response_buffer[BUFSIZE] = { 0 };
 	
-	int len = strlen(resp_start);
-	int pos = len;
-	memcpy(response_buffer, resp_start, len+1);
-		
-	
-	int records_size = 0;
-	evaluate_size_databases(&records_size);
-		
+	int pos = strlen(resp_start);
+	strcpy(response_buffer, resp_start);	
 
-	char rec_size[10];
-	itoa(records_size, rec_size, 9);
-	len = strlen(rec_size);
+	char table_size[10];
+	itoa(cfg.records_num, table_size, 9);
+	int len = strlen(table_size);
 	pos += len;
-	strncat(response_buffer, rec_size, len);
+	strcat(response_buffer, table_size);
 	response_buffer[pos] = '|';
 	pos++;
-	
-
-	FILE* dbusers = NULL;
-	if ( !(dbusers = fopen(DB_USERINFO_NAME, "rb")) )
-	{	
-		session_send_string(sess, "*CANNOT_CONNECT_DATABASE\n");
-		return;
-	}
-	
-	
-	int* db_non_empty_idxs = malloc(sizeof(int) * records_size);
-
-	int i;
-	for ( i = 0; i < records_size; i++ )
-		db_non_empty_idxs[i] = -1;
+	response_buffer[pos] = '\0';
 
 
-	char non_empty_rec[10];
+	char non_empty_recs[10];
 	int non_empty_recs_counter = 0;
-	
-
-	for (i = 0; i < records_size; i++ )
+	int i;
+	for ( i = 0; i < cfg.records_num; i++ )
 	{
-		DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
-		fseek(dbusers, i * sizeof(DBUsersInformation), SEEK_SET);
-		fread(record, sizeof(DBUsersInformation), 1, dbusers);
-
-		if ( (record->ID == -1) || (strcmp(record->pass, "undefined") == 0) || (strcmp(record->username, "undefined") == 0) || (record->rank[0] == 'u') )
+		char key[10];
+		itoa(i, key, 9);
+		
+		char id[ID_SIZE];
+		if ( !get_field_from_db(id, key, ID) )
 		{
-			free(record);
 			continue;
 		}
 
-		db_non_empty_idxs[i] = i;
 		non_empty_recs_counter++;
-
-		free(record);
 	}
 
-
-	itoa(non_empty_recs_counter, non_empty_rec, 9);
-	len = strlen(non_empty_rec);
+	itoa(non_empty_recs_counter, non_empty_recs, 9);
+	len = strlen(non_empty_recs);
 	pos += len;
-	strncat(response_buffer, non_empty_rec, len);
+	strncat(response_buffer, non_empty_recs, len);
 	response_buffer[pos] = '|';
 	pos++;
+	response_buffer[pos] = '\0';
 
 	if ( is_userdata )
 	{
 		const char* dbu = "USERINFO|";
-		
 		len = strlen(dbu);
 		pos += len;
 		strncat(response_buffer, dbu, len);
 
-
-		DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
-		if ( !record )
+		for ( i = 0; i < cfg.records_num; i++ )
 		{
-			if ( db_non_empty_idxs )
-				free(db_non_empty_idxs);
+			char key[10];
+			itoa(i, key, 9);
 			
-			if ( dbusers )
-				fclose(dbusers);
-
-			fprintf(stderr, "[%s] %s In function \"table_command_handler\" memory error with \"record\"\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
-			return;
-		}
-
-		for ( i = 0; i < records_size; i++ )
-		{
-			memset(record, 0, sizeof(DBUsersInformation));
-			fseek(dbusers, i * sizeof(DBUsersInformation), SEEK_SET);
-			fread(record, sizeof(DBUsersInformation), 1, dbusers);
-
-			if ( db_non_empty_idxs[i] > -1 )
+			char id[ID_SIZE];
+			if ( !get_field_from_db(id, key, ID) )
 			{
-				char buf_id[ID_SIZE];
-				itoa(record->ID, buf_id, ID_SIZE-1);
-				
-				enum { ARGS = 4 };
-				const char* args[ARGS] = 
-				{
-					buf_id,
-					record->username,
-					record->pass,
-					record->rank
-				};
+				continue;
+			}
+		
+			char username[LOGIN_SIZE];
+			if ( !get_field_from_db(username, key, USERNAME) )
+			{
+				return;
+			}
 
-				int j;
-				for ( j = 0; j < ARGS; j++ )
-				{
-					len = strlen(args[j]);
-					pos += len;
-					strncat(response_buffer, args[j], len);
-					response_buffer[pos] = '|';
-					pos++;
-				}
+			char pass[PASS_SIZE];
+			if ( !get_field_from_db(pass, key, PASS) )
+			{
+				return;
+			}
+
+			char rank[RANK_SIZE];
+			if ( !get_field_from_db(rank, key, RANK) )
+			{
+				return;
+			}
+
+			enum { ARGS = 4 };
+			const char* args[ARGS] = 
+			{
+					id,
+					username,
+					pass,
+					rank
+			};
+
+			int j;
+			for ( j = 0; j < ARGS; j++ )
+			{
+				len = strlen(args[j]);
+				pos += len;
+				strncat(response_buffer, args[j], len);
+				response_buffer[pos] = '|';
+				pos++;
+				response_buffer[pos] = '\0';
 			}
 		}
-
-		if ( dbusers )
-			fclose(dbusers);
-
-		if ( record )
-			free(record);
 	}
 	else
 	{
-		if ( dbusers )
-			fclose(dbusers);
-
-		FILE* dbxusers = NULL;
-		if ( !(dbxusers = fopen(DB_XUSERINFO_NAME, "rb")) )
-		{	
-			if ( db_non_empty_idxs )
-				free(db_non_empty_idxs);
-
-			session_send_string(sess, "*CANNOT_CONNECT_DATABASE\n");
-			return;
-		}
-
 		const char* dbx = "XUSERINFO|";
 		len = strlen(dbx);
 		pos += len;
 		strncat(response_buffer, dbx, len);
 
-	
-		DBXUsersInformation* record = malloc(sizeof(DBXUsersInformation));
-		if ( !record )
+		for ( i = 0; i < cfg.records_num; i++ )
 		{
-			if ( db_non_empty_idxs )
-				free(db_non_empty_idxs);
+			char key[10];
+			itoa(i, key, 9);
 			
-			if ( dbxusers )
-				fclose(dbxusers);
-
-			fprintf(stderr, "[%s] %s In function \"table_command_handler\" memory error with \"record\"\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
-			return;
-		}
-
-		for ( i = 0; i < records_size; i++ )
-		{
-			memset(record, 0, sizeof(DBXUsersInformation));
-			fseek(dbxusers, i * sizeof(DBXUsersInformation), SEEK_SET);
-			fread(record, sizeof(DBXUsersInformation), 1, dbxusers);
-
-			if ( db_non_empty_idxs[i] > -1 )
+			char id[ID_SIZE];
+			if ( !get_field_from_db(id, key, ID) )
 			{
-				char buf_id[10];
-				itoa(record->ID, buf_id, 10);
-				
-				enum { ARGS = 5 };
-				const char* args[] =
-				{
-						buf_id,
-						record->registration_date,
-						record->last_date_in,
-						record->last_date_out,
-						record->last_ip
-				};
-				
-				int j;
-				for ( j = 0; j < ARGS; j++ )
-				{
-					len = strlen(args[j]);
-					pos += len;
-					strncat(response_buffer, args[j], len);
-					response_buffer[pos] = '|';
-					pos++;
-				}
+				continue;
+			}
+			
+			char registration_date[REG_DATE_SIZE];
+			if ( !get_field_from_db(registration_date, key, REGISTRATION_DATE) )
+			{
+				return;
+			}
 
+			char ldi[LAST_DATE_IN_SIZE];
+			if ( !get_field_from_db(ldi, key, LAST_DATE_IN) )
+			{
+				return;
+			}
+
+			char ldo[LAST_DATE_IN_SIZE];
+			if ( !get_field_from_db(ldo, key, LAST_DATE_OUT) )
+			{
+				return;
+			}
+
+			char last_ip[LAST_IP_SIZE];
+			if ( !get_field_from_db(last_ip, key, LAST_IP) )
+			{
+				return;
+			}
+
+			enum { ARGS = 5 };
+			const char* args[] =
+			{
+					id,
+					registration_date,
+					ldi,
+					ldo,
+					last_ip
+			};
+			
+			int j;
+			for ( j = 0; j < ARGS; j++ )
+			{
+				len = strlen(args[j]);
+				pos += len;
+				strncat(response_buffer, args[j], len);
+				response_buffer[pos] = '|';
+				pos++;
+				response_buffer[pos] = '\0';
 			}
 		}
-		
-		if ( record )
-			free(record);
-
-		if ( dbxusers )
-			fclose(dbxusers);
 	}
 
 	response_buffer[pos-1] = '\n';
 	response_buffer[pos] = '\0';
 	
-	if ( db_non_empty_idxs )
-		free(db_non_empty_idxs);
-
 	session_send_string(sess, response_buffer);
 }
 

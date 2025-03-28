@@ -5,6 +5,7 @@
 #include "../Commons.h"
 #include "../DateTime.h"
 #include "../DatabaseStructures.h"
+#include <ctype.h>
 
 static const char* empty_field = "undefined";
 
@@ -23,14 +24,14 @@ int db_get_new_record_index(const char* table_name)
 		fprintf(stderr, "[%s] %s In function \"db_get_new_record_index\" incorrect \"table_name\" argument!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
-	
+
 	FILE* fd;
 	if ( (fd = fopen(table_name, "rb")) == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_get_new_record_index\" file \"%s\" does not exist!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, table_name);
 		return -1;
 	}
-	
+
 	int index = 0;
 	DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
 	if ( !record )
@@ -47,15 +48,15 @@ int db_get_new_record_index(const char* table_name)
 		{
 			free(record);
 			fclose(fd);
-			return index; 
+			return index;
 		}
 
-		index++;		
+		index++;
 	}
 
 	if ( record )
 		free(record);
-	
+
 	fclose(fd);
 
 	return -1;
@@ -70,7 +71,7 @@ int db_userinfo_table_get_size(const char* table_name)
 		fprintf(stderr, "[%s] %s In function \"db_userinfo_table_get_size\" incorrect \"table_name\" argument!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
-	
+
 	FILE* fd;
 	if ( (fd = fopen(table_name, "rb")) == NULL )
 	{
@@ -91,12 +92,12 @@ int db_userinfo_table_get_size(const char* table_name)
 	while ( !feof(fd) )
 	{
 		fread(record, sizeof(DBUsersInformation), 1, fd);
-		records_num++;		
+		records_num++;
 	}
-	
+
 	if ( record )
 		free(record);
-	
+
 	fclose(fd);
 
 	return records_num;
@@ -142,18 +143,18 @@ int db_userinfo_table_is_empty(const char* table_name)
 				break;
 			}
 		}
-		
+
 		if ( first_record )
 			free(first_record);
-		
+
 		fclose(fd);
-		
+
 		if ( non_empty_record )
 			return 0;
-		
+
 		return 1;
 	}
-	
+
 	fprintf(stderr, "[%s] %s In function \"db_userinfo_table_is_empty\" \"records_num\" less than 1!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 	return 0;
 }
@@ -197,18 +198,18 @@ int db_userinfo_table_is_full(const char* table_name)
 				break;
 			}
 		}
-		
+
 		if ( first_record )
 			free(first_record);
-		
+
 		fclose(fd);
-		
+
 		if ( empty_record )
 			return 0;
-		
+
 		return 1;
 	}
-	
+
 	fprintf(stderr, "[%s] %s In function \"db_userinfo_table_is_full\" \"records_num\" less than 1!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 	return 0;
 }
@@ -222,7 +223,7 @@ int db_create_userinfo_table(int records_num, const char* table_name)
 		fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" unable to initialize \"%s\" database file. Incorrect records num value!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, table_name);
 		return 0;
 	}
-	
+
 	FILE* fd;
 	if ( (fd = fopen(table_name, "rb")) == NULL )
 	{
@@ -236,13 +237,13 @@ int db_create_userinfo_table(int records_num, const char* table_name)
 	else
 	{
 		fclose(fd);
-		
+
 		int read_size = db_userinfo_table_get_size(table_name);
 		if ( read_size < 0 )
-		{		
+		{
 			return 0;
 		}
-		
+
 		if ( read_size == records_num )
 		{
 			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" table \"%s\" is already initialized!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
@@ -253,12 +254,12 @@ int db_create_userinfo_table(int records_num, const char* table_name)
 		{
 			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 			return 0;
-		}	
+		}
 
 		if ( read_size > 0 )
 			if ( records_num > read_size )
 				records_num -= read_size;
-		
+
 	}
 
 	DBUsersInformation* new_record = malloc( sizeof(DBUsersInformation) );
@@ -275,23 +276,23 @@ int db_create_userinfo_table(int records_num, const char* table_name)
 		memset(new_record, 0, sizeof(DBUsersInformation));
 
 		new_record->ID = -1;
-		
+
 		memcpy(new_record->username, empty_field, strlen(empty_field)+1);
 		memcpy(new_record->pass, empty_field, strlen(empty_field)+1);
 
 		new_record->rank[0] = 'u';
 		new_record->rank[1] = '\0';
-		
+
 		new_record->age = -1;
 		memcpy(new_record->realname, empty_field, strlen(empty_field)+1);
 		memcpy(new_record->quote, empty_field, strlen(empty_field)+1);
 
 		fwrite(new_record, sizeof(DBUsersInformation), 1, fd);
 	}
-	
+
 	if ( new_record )
 		free(new_record);
-	
+
 	if ( fd )
 		fclose(fd);
 
@@ -307,7 +308,7 @@ int db_usersessions_table_get_size(const char* table_name)
 		fprintf(stderr, "[%s] %s In function \"db_usersessions_table_get_size\" incorrect \"table_name\" argument!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
-	
+
 	FILE* fd;
 	if ( (fd = fopen(table_name, "rb")) == NULL )
 	{
@@ -327,12 +328,12 @@ int db_usersessions_table_get_size(const char* table_name)
 	while ( !feof(fd) )
 	{
 		fread(record, sizeof(DBXUsersInformation), 1, fd);
-		records_num++;		
+		records_num++;
 	}
-	
+
 	if ( record )
 		free(record);
-	
+
 	fclose(fd);
 
 	return records_num;
@@ -377,18 +378,18 @@ int db_usersessions_table_is_empty(const char* table_name)
 				break;
 			}
 		}
-		
+
 		if ( first_record )
 			free(first_record);
-		
+
 		fclose(fd);
-		
+
 		if ( non_empty_record )
 			return 0;
-		
+
 		return 1;
 	}
-	
+
 	fprintf(stderr, "[%s] %s In function \"db_usersessions_table_is_empty\" \"records_num\" less than 1!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 	return 0;
 }
@@ -432,18 +433,18 @@ int db_usersessions_table_is_full(const char* table_name)
 				break;
 			}
 		}
-		
+
 		if ( first_record )
 			free(first_record);
-		
+
 		fclose(fd);
-		
+
 		if ( empty_record )
 			return 0;
-		
+
 		return 1;
 	}
-	
+
 	fprintf(stderr, "[%s] %s In function \"db_usersessions_table_is_full\" \"records_num\" less than 1!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 	return 0;
 }
@@ -471,10 +472,10 @@ int db_create_usersessions_table(int records_num, const char* table_name)
 	else
 	{
 		fclose(fd);
-	
+
 		int read_size = db_usersessions_table_get_size(table_name);
 		if ( read_size < 0 )
-		{		
+		{
 			return 0;
 		}
 
@@ -483,7 +484,7 @@ int db_create_usersessions_table(int records_num, const char* table_name)
 			fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" table \"%s\" is already initialized!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
 			return 1;
 		}
-		
+
 		if ( (fd = fopen(table_name, "ab")) == NULL )
 		{
 			fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
@@ -493,7 +494,6 @@ int db_create_usersessions_table(int records_num, const char* table_name)
 		if ( read_size > 0 )
 			if ( records_num > read_size )
 				records_num -= read_size;
-		
 	}
 
 
@@ -515,34 +515,34 @@ int db_create_usersessions_table(int records_num, const char* table_name)
 		new_record->mute_time = 0;
 		new_record->start_mute_time = 0;
 		new_record->mute_time_left = 0;
-		
+
 		memcpy(new_record->last_ip, empty_field, strlen(empty_field)+1);
 		memcpy(new_record->last_date_in, empty_field, strlen(empty_field)+1);
 		memcpy(new_record->registration_date, empty_field, strlen(empty_field)+1);
 		memcpy(new_record->last_date_out, empty_field, strlen(empty_field)+1);
-	
+
 		fwrite(new_record, sizeof(DBXUsersInformation), 1, fd);
 	}
-	
+
 	if ( new_record )
 		free( new_record );
 
 	if ( fd )
 		fclose(fd);
-	
+
 	return 1;
 }
 
-int db_get_record_index_by_name(const char* nickname, const char* userinfo_table_name)
+int db_get_record_index(const char* search_key, const char* userinfo_table_name)
 {
 	char cur_time[MAX_TIME_STR_SIZE] = { 0 };
-	
-	if ( nickname == NULL )
+
+	if ( search_key == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_get_record_index_by_name\" an internal error has occured. \"nickname\" param is NULL\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
-	
+
 	if ( userinfo_table_name == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_get_record_index_by_name\" an internal error has occured. \"userinfo_table_name\" is NULL\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
@@ -555,14 +555,14 @@ int db_get_record_index_by_name(const char* nickname, const char* userinfo_table
 		fprintf(stderr, "[%s] %s An internal error occured in \"get_record_index_by_name\" while attempting to get \"record_size\" param. It's 0\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
-	
+
 	FILE* fd = NULL;
 	if ( !(fd = fopen(userinfo_table_name, "rb")) )
 	{
 		fprintf(stderr, "[%s] %s In function \"get_record_index_by_name\" unable to open file \"%s\". Is it exist?\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, userinfo_table_name);
 		return -1;
 	}
-	
+
 	DBUsersInformation* record = malloc( sizeof(DBUsersInformation) );
 	if ( !record )
 	{
@@ -571,17 +571,37 @@ int db_get_record_index_by_name(const char* nickname, const char* userinfo_table
 		return -1;
 	}
 
+	int is_number = 0;
 	int i;
+	for ( i = 0; search_key[i]; i++ )
+	{
+		if ( !isdigit(search_key[i]) )
+		{
+			is_number = 0;
+			break;
+		}
+		is_number = 1;
+	}
+
 	for (i = 0; i < records_size; i++)
 	{
 		memset(record, 0, sizeof(DBUsersInformation));
 		fseek(fd, i * sizeof(DBUsersInformation), SEEK_SET);
 		fread(record, sizeof(DBUsersInformation), 1, fd);
 
-		if ( strcmp(record->username, nickname) == 0 )
-			break;
+		if ( !is_number )
+		{
+			if ( strcmp(record->username, search_key) == 0 )
+				break;
+		}
+		else
+		{
+			int key = atoi(search_key);
+			if ( record->ID == key )
+				break;
+		}
 	}
-	
+
 	if ( record )
 		free(record);
 
@@ -590,18 +610,19 @@ int db_get_record_index_by_name(const char* nickname, const char* userinfo_table
 
 	if ( i == records_size )
 	{
-		fprintf(stderr, "[%s] %s In function \"get_record_index_by_name\" unable to find record with name \"%s\" in \"%s\" table!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, nickname, userinfo_table_name);
+		fprintf(stderr, "[%s] %s In function \"get_record_index_by_name\" unable to find record with search key \"%s\" in \"%s\" table!\n",
+				get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, search_key, userinfo_table_name);
 		return -1;
 	}
 
 	return i;
 }
 
-char* db_readline_from_tables(const char* name, const char* userinfo_table_name, const char* usersessions_table_name)
+char* db_readline_from_tables(const char* search_key, const char* userinfo_table_name, const char* usersessions_table_name)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
 
-	if ( name == NULL )
+	if ( search_key == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_readline_from_tables\" \"name\" is NULL!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return NULL;
@@ -619,8 +640,7 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 		return NULL;
 	}
 
-	int index = db_get_record_index_by_name(name, userinfo_table_name);
-	
+	int index = db_get_record_index(search_key, userinfo_table_name);
 	if ( index < 0 )
 	{
 		return NULL;
@@ -685,7 +705,7 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 	pos++;
 	result[pos] = '\0';
 
-	
+
 	pos += strlen(record->realname);
 	strcat(result, record->realname);
 	result[pos] = '|';
@@ -708,14 +728,14 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 	result[pos] = '|';
 	pos++;
 	result[pos] = '\0';
-	
+
 	if ( record )
 		free(record);
 
 	if ( fd )
 		fclose(fd);
 
-	
+
 	fd = NULL;
 	if ( !(fd = fopen(usersessions_table_name, "rb")) )
 	{
@@ -736,7 +756,7 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 	fseek(fd, index * sizeof(DBXUsersInformation), SEEK_SET);
 	fread(xrecord, sizeof(DBXUsersInformation), 1, fd);
 
-	
+
 	itoa(xrecord->muted, buffer, 99);
 
 	pos += strlen(buffer);
@@ -746,8 +766,8 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 	result[pos] = '\0';
 
 	memset(buffer, 0, sizeof(buffer));
-	
-	
+
+
 	itoa(xrecord->start_mute_time, buffer, 99);
 
 	pos += strlen(buffer);
@@ -800,7 +820,7 @@ char* db_readline_from_tables(const char* name, const char* userinfo_table_name,
 	result[pos] = '|';
 	pos++;
 	result[pos] = '\0';
-	
+
 
 	pos += strlen(xrecord->registration_date);
 	strcat(result, xrecord->registration_date);
@@ -896,13 +916,13 @@ int db_writeline_to_tables(char* writeline, const char* userinfo_table_name, con
 		fprintf(stderr, "[%s] %s In function \"db_writeline_to_tables\" an internal error has occured. Memory error in \"record\"!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
-	
+
 	int index = atoi(mes_tokens[0]);
 	fseek(userinfo, index * sizeof(DBUsersInformation), SEEK_SET);
 	fread(record, sizeof(DBUsersInformation), 1, userinfo);
 
 	record->ID = index;
-	
+
 	if ( strcmp(mes_tokens[1], empty_field) != 0 )
 	{
 		int len = strlen(mes_tokens[1]);
@@ -916,21 +936,21 @@ int db_writeline_to_tables(char* writeline, const char* userinfo_table_name, con
 		memcpy(record->pass, mes_tokens[2], len);
 		record->pass[len] = '\0';
 	}
-	
+
 	if ( strcmp(mes_tokens[3], "u") != 0 )
 	{
 		int len = strlen(mes_tokens[3]);
 		memcpy(record->rank, mes_tokens[3], len);
 		record->rank[len] = '\0';
 	}
-	
+
 	if ( strcmp(mes_tokens[4], empty_field) != 0 )
 	{
 		int len = strlen(mes_tokens[4]);
 		memcpy(record->realname, mes_tokens[4], len);
 		record->realname[len] = '\0';
 	}
-	
+
 	if ( strcmp(mes_tokens[5], empty_field) != 0 )
 		record->age = atoi(mes_tokens[5]);
 
@@ -945,22 +965,22 @@ int db_writeline_to_tables(char* writeline, const char* userinfo_table_name, con
 	fwrite(record, sizeof(DBUsersInformation), 1, userinfo);
 	fclose(userinfo);
 	free(record);
-	
-	
+
+
 	fseek(usersessions, index * sizeof(DBXUsersInformation), SEEK_SET);
 	fread(xrecord, sizeof(DBXUsersInformation), 1, usersessions);
-	
+
 	xrecord->ID = index;
-	
+
 	if ( strcmp(mes_tokens[7], empty_field) != 0 )
 		xrecord->muted = atoi(mes_tokens[7]);
 	if ( strcmp(mes_tokens[8], empty_field) != 0 )
 		xrecord->start_mute_time = atoi(mes_tokens[8]);
 	if ( strcmp(mes_tokens[9], empty_field) != 0 )
 		xrecord->mute_time = atoi(mes_tokens[9]);
-	if ( strcmp(mes_tokens[10], empty_field) != 0 )	
+	if ( strcmp(mes_tokens[10], empty_field) != 0 )
 		xrecord->mute_time_left = atoi(mes_tokens[10]);
-	
+
 	if ( strcmp(mes_tokens[11], empty_field) != 0 )
 	{
 		int len = strlen(mes_tokens[11]);

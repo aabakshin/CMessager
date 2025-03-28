@@ -253,17 +253,17 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 	}
 	else if ( strcmp(mes_tokens[0], db_commands_names[DB_READLINE]) == 0 )
 	{
-		char username[100];
+		char search_key[100];
 		int len = strlen(mes_tokens[1]);
 		
 		if ( len >= 100 )
 			len = 99;
 
-		memcpy(username, mes_tokens[1], len);
-		username[len] = '\0';
+		memcpy(search_key, mes_tokens[1], len);
+		search_key[len] = '\0';
 
 		const char* msg_to_send = NULL;
-		char* readline = db_readline_from_tables(username, serv_ptr->userinfo_table_name, serv_ptr->usersessions_table_name);
+		char* readline = db_readline_from_tables(search_key, serv_ptr->userinfo_table_name, serv_ptr->usersessions_table_name);
 		if ( readline == NULL )
 		{
 			msg_to_send = "DB_LINE_NOT_FOUND\n";
