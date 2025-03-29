@@ -4,7 +4,6 @@
 #define CONFIG_NAME											"server.properties"
 #define OPS_NAME											"ops.txt"
 
-
 #define CONFIG_SETTING_DEFAULT_DB_SIZE_NAME					"currentDbSize"
 #define CONFIG_SETTING_DEFAULT_DB_SIZE_VALUE				"10"
 

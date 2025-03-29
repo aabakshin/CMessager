@@ -1,5 +1,3 @@
-/* Файл реализации модуля Commons */
-
 #ifndef COMMONS_C_SENTRY
 #define COMMONS_C_SENTRY
 
@@ -233,7 +231,7 @@ void print_record(char** args, int args_size, int debug_mode)
 	{
 		if ( args_size != DEBUG_RECORD_FIELDS_NUM )
 		{
-			fprintf(stderr, "[%s] [ERROR]: Unexpected behaviour has occured while printing record\n", get_time_str(cur_time, MAX_TIME_STR_SIZE));
+			fprintf(stderr, "[%s] %s Unexpected behaviour has occured while printing record\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 			return;
 		}
 

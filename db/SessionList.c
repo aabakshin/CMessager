@@ -82,20 +82,20 @@ const ClientData* sess_remove(Session** list_ptr, const ClientData* data)
 			*list_ptr = (*list_ptr)->next;
 
 		}
-		
+
 		free(tempPtr);
 
 		return data;
 	}
-	
+
 	if ( curPtr->next == NULL )
 	{
 		prevPtr->next = NULL;
 		free(tempPtr);
-		
+
 		return data;
 	}
-	
+
 	prevPtr->next = curPtr->next;
 	curPtr->next->prev = prevPtr;
 	free(tempPtr);
@@ -116,7 +116,7 @@ int sess_get_size(Session* list)
 		size++;
 		list = list->next;
 	}
-	
+
 	return size;
 }
 
@@ -143,10 +143,10 @@ int sess_clear(Session** list_ptr, int clear)
 			removed++;
 		}
 	}
-	
+
 	if ( removed == size )
 		return 1;
-	
+
 	fprintf(stderr, "%s", "\n[StringList]: In function \"sl_clear\" error: unable to clear list\n");
 	return 0;
 }
@@ -158,7 +158,7 @@ void sess_print(Session* list)
 		fprintf(stderr, "%s", "\n[StringList]: In function \"sl_print\" error: list is empty!\n");
 		return;
 	}
-	
+
 	int i = 0;
 
 	printf("%s", "\nStringList is: ");

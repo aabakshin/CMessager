@@ -1,12 +1,10 @@
-/* Модуль запуска клиента */
-
 #include "Commons.h"
 #include "clientCore.h"
 #include "DateTime.h"
 #include <termios.h>
 #include <signal.h>
 
-/* Описан в модуле clientCore */
+
 extern CommandsHistoryList* chl_list;
 
 int exit_flag = 0;
@@ -133,13 +131,7 @@ int main(int argc, char** argv)
 				istr = strtok(NULL, "|");
 			}
 			int response_tokens_size = i;
-			
-			/*
-			printf("response_tokens_size = %d\n", response_tokens_size);
-			for (i = 0; i < response_tokens_size; i++)
-				printf("%s\n", response_tokens[i]);
-			*/
-			
+
 			if ( check_server_response(peer_sock, response_tokens, response_tokens_size, &authorized) )
 			{
 				printf("\nReceived %d bytes\n\n", bytes_received);
@@ -161,14 +153,7 @@ int main(int argc, char** argv)
 			do
 			{
 				int str_len = get_str(send_buf, BUFSIZE);
-				/*printf("\nstr_len = %d\n", str_len);
-				
-				int i;
-				for ( i = 0; i < 10; i++ )
-					printf("%d ", send_buf[i]);
-				putchar('\n');
-				*/
-
+	
 				if ( str_len < 1 )
 				{
 					if ( str_len == EXIT_CODE )
@@ -207,28 +192,6 @@ int main(int argc, char** argv)
 			interval = timestamps[1] - timestamps[0];
 			if ( interval < 0 )
 				interval *= -1;
-
-			/*printf("interval = %lld\n", interval);*/
-			
-			/*
-			int is_n_sym = 0;
-			int i;
-			for ( i = 0; send_buf[i]; i++ )
-			{
-				if ( send_buf[i] == '\n' )
-				{
-					is_n_sym = 1;
-					break;
-				}
-			}
-			
-			if ( !is_n_sym )
-			{
-				int len = strlen(send_buf);
-				send_buf[len] = '\n';
-				send_buf[len+1] = '\0';
-			}
-			*/
 
 			sendall(peer_sock, send_buf, &sent_bytes);
 			printf("Sent %d bytes\n\n", sent_bytes);
@@ -271,28 +234,9 @@ int main(int argc, char** argv)
 					}
 					printf("\nYour code: %s\n", code);
 
-					
 					int len = get_string(answer, 100);
-					/*printf("len = %d\n", len);*/
 					answer[len-1] = '\0';
 					
-					/*
-					printf("%s", "\nanswer = ");
-					int k;
-					for ( k = 0; k < 10; k++ )
-					{
-						printf("%d ", answer[k]);
-					}
-					putchar('\n');
-					
-					printf("%s", "\ncode = ");
-					for ( k = 0; k < 10; k++ )
-					{
-						printf("%d ", code[k]);
-					}
-					putchar('\n');
-					*/
-
 					if ( strcmp(answer, code) == 0 )
 					{
 						printf("\n%s\n", "You can continue to chat.");

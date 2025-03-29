@@ -1,5 +1,3 @@
-/* Модуль Commons содержит вспомогательные и отладочные функции, а также константы, которые может использовать как клиент так и сервер */
-
 #ifndef COMMONS_H_SENTRY
 #define COMMONS_H_SENTRY
 
@@ -93,6 +91,5 @@ void itoa(int number, char* num_buf, int max_buf_len);
 char* concat_addr_port(unsigned long ip, unsigned long port);
 int check_client_answer(const char* answer);
 unsigned long long get_tick_unix(void);
-
 
 #endif

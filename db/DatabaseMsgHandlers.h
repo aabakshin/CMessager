@@ -1,5 +1,3 @@
-/* Операции совершаемые с базой данных */
-
 #ifndef DATABASE_MSG_HANDLERS_H_SENTRY
 #define DATABASE_MSG_HANDLERS_H_SENTRY
 

@@ -1,5 +1,3 @@
-/* Модуль запуска сервера дазы банных */
-
 #include "SessionList.h"
 #include "serverDatabase.h"
 #include "../Commons.h"
@@ -8,7 +6,7 @@
 int main(int argc, char** argv)
 {
 	char cur_time[CURRENT_TIME_SIZE];
-	
+
 	Server serv;
 	serv.ls = -1;
 	serv.sess_list = NULL;
@@ -28,7 +26,7 @@ int main(int argc, char** argv)
 		fprintf(stderr, "[%s] %s Incorrect port number\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 		return 2;
 	}
-	
+
 	int listen_sock = -1;
 	if ( (listen_sock = db_server_init(port_number)) == -1 )
 	{

@@ -1,5 +1,3 @@
-/* Файл реализации модуля DateTime */
-
 #ifndef DATETIME_C_SENTRY
 #define DATETIME_C_SENTRY
 

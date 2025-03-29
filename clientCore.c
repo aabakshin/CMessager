@@ -1,5 +1,3 @@
-/* Файл реализации модуля clientCore */
-
 #ifndef CLIENTCORE_C_SENTRY
 #define CLIENTCORE_C_SENTRY
 
@@ -23,7 +21,7 @@ static int end_flag = 1;
 
 extern int exit_flag;
 
-/* Стандартная процедура инициализации клиентского TCP-сокета */
+
 int client_init(const char* address, const char* port)
 {
 	int ok;
@@ -149,18 +147,8 @@ static void send_answer(int peer_sock, const char** box_messages, int box_messag
 			exit_flag = 1;
 			return;
 		}
-		
-		/*
-		putchar('\n');
-		int i;
-		for ( i = 0; i < 10; i++ )
-			printf("%d ", message[i]);
-		putchar('\n');
-		*/
 	}
 	while ( len < 2 );
-	
-	/*printf("\nlen = %d\n", len);*/
 
 	if ( len > max_read_chars )
 		clear_stdin();
@@ -226,14 +214,6 @@ int get_str(char* buffer, int buffer_size)
 		if ( rc < 1 )
 			continue;
 		
-		/*
-		printf("\nrc = %d\n", rc);
-		int c;
-		for ( c = 0; c < 6; c++ )
-			printf("read_sym[%d] = %d\n", c, read_sym[c]);
-		break;
-		*/
-
 		if ( rc == 1 )
 		{
 			if ( read_sym[0] == 3 ) /* Ctrl-C */
@@ -512,15 +492,6 @@ int get_str(char* buffer, int buffer_size)
 							if ( cur_pos->prev != NULL )
 								cur_pos = cur_pos->prev;
 						}
-						
-						
-						/*
-						printf("\ncur_pos->command_size = %d\n", cur_pos->command_size);
-						int j;
-						for ( j = 0; j < 10; j++ )
-							printf("%d ", cur_pos->command[j]);
-						putchar('\n');
-						*/
 
 						int j;
 						for ( j = 0; cur_pos->command[j] && (j < buffer_size-2); j++, i++ )
@@ -531,7 +502,6 @@ int get_str(char* buffer, int buffer_size)
 						fflush(stdout);
 					}
 			}
-
 
 			/* обработка клавиши ARROW_DOWN с 3-х байтным кодом */
 			else if (     
@@ -559,10 +529,6 @@ int get_str(char* buffer, int buffer_size)
 						if ( end_flag )
 						{
 							end_flag = 0;
-							/*if ( chl_list->next != NULL)
-								cur_pos = chl_list->next;
-							else
-								cur_pos = chl_list;	*/
 							cur_pos = chl_list;
 						}
 						else

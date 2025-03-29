@@ -15,7 +15,7 @@ enum
 	VALID_STATUSES_NUM		=			  4
 };
 
-const char* valid_commands[] = 
+const char* valid_commands[] =
 {
 			"",
 			"/help",
@@ -67,7 +67,7 @@ int clear_cmd_args(char** cmd_args, int args_num)
 		}
 	}
 	free(cmd_args);
-	
+
 	if ( deleted == args_num )
 		return 1;
 
@@ -116,7 +116,7 @@ void command_overlimit_length_handler(ClientSession *sess)
 	buf[pos] = '\n';
 	pos++;
 	buf[pos] = '\0';
-	
+
 	session_send_string(sess, buf);
 }
 
@@ -171,7 +171,7 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 										"/stop - save config files, update db records and then stop server",
 										NULL
 									};*/
-	
+
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"help_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -183,7 +183,7 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		session_send_string(sess, "*COMMAND_PARAMS_NO_NEED\n");
 		return;
 	}
-	
+
 	const char* help = "*HELP_COMMAND_SUCCESS|";
 	int len = strlen(help);
 	int pos = len;
@@ -193,8 +193,8 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		make_send_buf(send_buf, pos, user_cmd_list);
 	else
 		make_send_buf(send_buf, pos, admin_cmd_list);
-	
-	
+
+
 	session_send_string(sess, send_buf);
 }
 
@@ -206,14 +206,10 @@ void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	char send_buf[BUFSIZE] = { 0 };
 	char cur_time[CUR_TIME_SIZE];
 
-	StringList* clients_list = clients_online;
-	
-	/*sl_print(clients_list);*/
-
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"whoih_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
-		cmd_args = NULL;	
+		cmd_args = NULL;
 	}
 
 	if ( args_num > 1 )
@@ -221,12 +217,13 @@ void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		session_send_string(sess, "*COMMAND_PARAMS_NO_NEED\n");
 		return;
 	}
-	
+
 	const char* whoih = "*WHOIH_COMMAND_SUCCESS|";
 	int len = strlen(whoih);
 	int pos = len;
 	memcpy(send_buf, whoih, len+1);
 
+	StringList* clients_list = clients_online;
 	while ( clients_list )
 	{
 		int i;
@@ -241,7 +238,7 @@ void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			pos += len;
 			strncat(send_buf, clients_list->data, len);
 		}
-		
+
 		clients_list = clients_list->next;
 
 		if ( clients_list )
@@ -250,7 +247,7 @@ void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			pos++;
 		}
 	}
-	
+
 	send_buf[pos] = '\n';
 	pos++;
 	send_buf[pos] = '\0';
@@ -283,14 +280,14 @@ void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"chgpass_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
-		cmd_args = NULL;	
+		cmd_args = NULL;
 	}
 
 	if ( is_valid_auth_str(buffer_pass, 1) )
 	{
 		int len = strlen(buffer_pass);
 		memcpy(sess->pass, buffer_pass, len+1);
-		
+
 		char rank[RANK_SIZE];
 		set_user_rank(sess);
 		rank[0] = get_user_rank(sess->rank);
@@ -301,17 +298,17 @@ void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 		char muted[MUTED_SIZE];
 		itoa(sess->muted, muted, MUTED_SIZE-1);
-		
+
 		char smt[START_MUTE_TIME_SIZE];
 		itoa(sess->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
-		
+
 		char mt[MUTE_TIME_SIZE];
 		itoa(sess->mute_time, mt, MUTE_TIME_SIZE-1);
 
 		char mtl[MUTE_TIME_LEFT_SIZE];
 		itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
-		const char* query_strings[] = 
+		const char* query_strings[] =
 		{
 						"DB_WRITELINE|",
 						sess->login,
@@ -330,7 +327,7 @@ void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 						"undefined",
 						NULL
 		};
-		
+
 		if ( !write_query_into_db(query_strings) )
 		{
 			return;
@@ -339,7 +336,7 @@ void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		session_send_string(sess, "*CHGPWD_COMMAND_SUCCESS\n");
 		return;
 	}
-	
+
 	session_send_string(sess, "*CHGPWD_COMMAND_INCORRECT_PASS\n");
 }
 
@@ -351,10 +348,10 @@ int eval_rank_num(const char* last_date_in, const char* registration_date)
 	}
 
 	unsigned long long time_user_exist = get_date_num(last_date_in) - get_date_num(registration_date);
-	
+
 	if ( time_user_exist < 7*86400 )
 		return FRESHMAN_RANK_VALUE;
-	
+
 	if ( (time_user_exist >= 7*86400) && (time_user_exist < 30*86400) )
 		return MEMBER_RANK_VALUE;
 
@@ -394,7 +391,7 @@ void set_user_rank(ClientSession *sess)
 	{
 		return;
 	}
-	
+
 	sess->rank = eval_rank_num(sess->last_date_in, sess->registration_date);
 }
 
@@ -437,7 +434,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 		return;
 	}
-	
+
 	char buffer_username[100];
 	memcpy(buffer_username, cmd_args[1], strlen(cmd_args[1])+1);
 
@@ -446,7 +443,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"op_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 		cmd_args = NULL;
 	}
-	
+
 
 	char id_param[ID_SIZE];
 	if ( !get_field_from_db(id_param, buffer_username, ID) )
@@ -456,11 +453,11 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	int index = atoi(id_param);
 	if ( index < 0 )
-	{	
+	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|OP|USER_NOT_FOUND\n");
 		return;
 	}
-	
+
 	int is_online = 0;
 	StringList* cl_onl = clients_online;
 	while ( cl_onl != NULL )
@@ -472,7 +469,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		}
 		cl_onl = cl_onl->next;
 	}
-	
+
 	if ( is_online )
 	{
 		int i;
@@ -491,7 +488,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 			if ( serv->sess_array[i]->muted )
 				eval_mute_time_left(serv->sess_array[i]);
-		
+
 			char smt[START_MUTE_TIME_SIZE];
 			if ( !get_field_from_db(smt, serv->sess_array[i]->login, START_MUTE_TIME) )
 			{
@@ -512,11 +509,11 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 				return;
 			}
 			serv->sess_array[i]->muted = atoi(muted);
-			
+
 			char mtl[MUTE_TIME_LEFT_SIZE];
 			itoa(serv->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
-			const char* query_strings[] = 
+			const char* query_strings[] =
 			{
 							"DB_WRITELINE|",
 							serv->sess_array[i]->login,
@@ -535,7 +532,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							"undefined",
 							NULL
 			};
-			
+
 			if ( !write_query_into_db(query_strings) )
 			{
 				return;
@@ -558,7 +555,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		if ( rank[0] != 'A' )
 		{
 			rank[0] = 'A';
-			const char* query_strings[] = 
+			const char* query_strings[] =
 			{
 							"DB_WRITELINE|",
 							buffer_username,
@@ -577,7 +574,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							"undefined",
 							NULL
 			};
-			
+
 			if ( !write_query_into_db(query_strings) )
 			{
 				return;
@@ -593,9 +590,9 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	char** ops_strings = NULL;
 	int strings_count = 0;
-	
+
 	ops_strings = parse_ops_file(&strings_count);
-	
+
 	FILE* dbops = NULL;
 	if ( !(dbops = fopen(OPS_NAME, "w")) )
 	{
@@ -629,7 +626,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	ops_strings[strings_count] = malloc( sizeof(char) * user_len + 1 );
 	memcpy(ops_strings[strings_count], buffer_username, user_len + 1);
 	strings_count++;
-	
+
 	int i;
 	for (i = 0; i < strings_count; i++)
 	{
@@ -640,7 +637,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			ops_strings[i] = NULL;
 		}
 	}
-	
+
 	if ( dbops )
 		fclose(dbops);
 
@@ -667,7 +664,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		}
 		return;
 	}
-	
+
 
 	char buffer_username[100];
 	memcpy(buffer_username, cmd_args[1], strlen(cmd_args[1])+1);
@@ -675,16 +672,16 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"deop_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
-		cmd_args = NULL;	
+		cmd_args = NULL;
 	}
 
 
 	/* удаляем пользователя из списка админов в файле ops.txt и перезаписываем этот файл */
 	char** ops_strings = NULL;
 	int strings_count = 0;
-	
+
 	ops_strings = parse_ops_file(&strings_count);
-	
+
 	FILE* dbops = NULL;
 	if ( !(dbops = fopen(OPS_NAME, "w")) )
 	{
@@ -702,19 +699,19 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 		return;
 	}
-	
+
 	if ( strings_count < 1 )
-	{	
+	{
 		if ( ops_strings )
 			free(ops_strings);
 
 		if ( dbops )
 			fclose(dbops);
-		
+
 		session_send_string(sess, "*DEOP_COMMAND_USER_ALREADY_USER\n");
 		return;
 	}
-	
+
 	int i;
 	for ( i = 0; i < strings_count; i++ )
 		if ( strcmp(ops_strings[i], buffer_username) == 0 )
@@ -732,7 +729,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 		if ( dbops )
 			fclose(dbops);
-		
+
 		session_send_string(sess, "*DEOP_COMMAND_USER_ALREADY_USER\n");
 		return;
 	}
@@ -742,7 +739,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	int len = 0;
 	for ( i = 0; ops_strings[strings_count-1][i]; i++ )
 		len++;
-	
+
 	if ( strings_count > 1 )
 	{
 		ops_strings[pos] = realloc(ops_strings[pos], sizeof(char)*len+1);
@@ -765,12 +762,11 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	if ( ops_strings )
 		free(ops_strings);
-	
+
 	if ( dbops )
 		fclose(dbops);
 	/* удаляем пользователя из списка админов в файле ops.txt и перезаписываем этот файл */
 
-	
 
 	char id_param[ID_SIZE];
 	if ( !get_field_from_db(id_param, buffer_username, ID) )
@@ -780,7 +776,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	int index = atoi(id_param);
 	if ( index < 0 )
-	{	
+	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|DEOP|USER_NOT_FOUND\n");
 		return;
 	}
@@ -796,7 +792,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		}
 		cl_onl = cl_onl->next;
 	}
-	
+
 	if ( is_online )
 	{
 		int i;
@@ -820,7 +816,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 			if ( serv->sess_array[i]->muted )
 				eval_mute_time_left(serv->sess_array[i]);
-		
+
 			char smt[START_MUTE_TIME_SIZE];
 			if ( !get_field_from_db(smt, serv->sess_array[i]->login, START_MUTE_TIME) )
 			{
@@ -841,11 +837,11 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 				return;
 			}
 			serv->sess_array[i]->muted = atoi(muted);
-			
+
 			char mtl[MUTE_TIME_LEFT_SIZE];
 			itoa(serv->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
-			const char* query_strings[] = 
+			const char* query_strings[] =
 			{
 							"DB_WRITELINE|",
 							serv->sess_array[i]->login,
@@ -864,7 +860,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							"undefined",
 							NULL
 			};
-			
+
 			if ( !write_query_into_db(query_strings) )
 			{
 				return;
@@ -901,7 +897,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			int rank_num = eval_rank_num(ldi, rd);
 			rank[0] = get_user_rank(rank_num);
 
-			const char* query_strings[] = 
+			const char* query_strings[] =
 			{
 							"DB_WRITELINE|",
 							buffer_username,
@@ -920,12 +916,12 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							"undefined",
 							NULL
 			};
-			
+
 			if ( !write_query_into_db(query_strings) )
 			{
 				return;
 			}
-		}		
+		}
 	}
 
 	session_send_string(sess, "*DEOP_COMMAND_SUCCESS\n");
@@ -935,7 +931,7 @@ void pm_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 {
 	if ( (sess == NULL) || (cmd_args == NULL) )
 		return;
-	
+
 	int user_offline = 1;
 	char buffer_username[100] = { 0 };
 	char buffer_message[BUFSIZE];
@@ -954,7 +950,7 @@ void pm_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		}
 		return;
 	}
-	
+
 	memcpy(buffer_username, cmd_args[1], strlen(cmd_args[1])+1);
 	memcpy(buffer_message, cmd_args[2], strlen(cmd_args[2])+1);
 
@@ -981,7 +977,7 @@ void pm_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		}
 		list = list->next;
 	}
-	
+
 	if ( user_offline )
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|PM|USER_OFFLINE\n");
 }
@@ -1010,7 +1006,7 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 {
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
 		return;
-	
+
 
 	const char* success = "*STATUS_COMMAND_SUCCESS|";
 	char buffer_message[BUFSIZE] = { 0 };
@@ -1027,9 +1023,9 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		}
 		return;
 	}
-	
+
 	const char* user_status_ptr = get_status_str(sess->user_status);
-	
+
 	int len = strlen(success);
 	int pos = len;
 	memcpy(buffer_message, success, len+1);
@@ -1037,10 +1033,10 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	if ( args_num == 2 )
 	{
 		memcpy(buffer_status, cmd_args[1], strlen(cmd_args[1])+1);
-		
+
 		if ( strcmp(user_status_ptr, buffer_status) == 0 )
 		{
-			session_send_string(sess, "*STATUS_COMMAND_ALREADY_SET\n");	
+			session_send_string(sess, "*STATUS_COMMAND_ALREADY_SET\n");
 			return;
 		}
 
@@ -1064,11 +1060,11 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 				pos += len;
 				strncat(buffer_message, stat_ptr, len);
 			}
-			
+
 			buffer_message[pos] = '\n';
 			pos++;
 			buffer_message[pos] = '\0';
-			
+
 			session_send_string(sess, buffer_message);
 		}
 		else
@@ -1116,14 +1112,14 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 		return;
 	}
-	
-	len = strlen(user_status_ptr); 
+
+	len = strlen(user_status_ptr);
 	pos += len;
 	strncat(buffer_message, user_status_ptr, len);
 	buffer_message[pos] = '\n';
 	pos++;
 	buffer_message[pos] = '\0';
-		
+
 	session_send_string(sess, buffer_message);
 
 	if ( !clear_cmd_args(cmd_args, args_num) )
@@ -1173,7 +1169,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 	{
 		if ( response_struct )
 			free(response_struct);
-	
+
 		fprintf(stderr, "[%s] %s [1] In function \"user_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 		return NULL;
@@ -1199,14 +1195,14 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 		case 'A':
 			strcpy(response_struct->rank, "ADMIN");
 	}
-	
+
 
 	/* извлечение поля AGE из таблицы */
 	if ( !get_field_from_db(response_struct->age, registered_username, AGE) )
 	{
 		if ( response_struct )
 			free(response_struct);
-	
+
 		fprintf(stderr, "[%s] %s [2] In function \"user_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 		return NULL;
@@ -1219,26 +1215,25 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 	{
 		if ( response_struct )
 			free(response_struct);
-	
+
 		fprintf(stderr, "[%s] %s [3] In function \"user_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 		return NULL;
-
 	}
-	
+
 
 	/* извлечение поля QUOTE из таблицы */
 	if ( !get_field_from_db(response_struct->quote, registered_username, QUOTE) )
 	{
 		if ( response_struct )
 			free(response_struct);
-	
+
 		fprintf(stderr, "[%s] %s [4] In function \"user_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 		return NULL;
 
 	}
-	
+
 
 	/* вычисление значения STATUS заданного клиента */
 	int i;
@@ -1257,30 +1252,30 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 		const char* offline = "offline";
 		strcpy(response_struct->status, offline);
 	}
-	
-	
+
+
 	/* извлечение поля REGISTRATION_DATE из таблицы */
 	char registration_date[REG_DATE_SIZE];
 	if ( !get_field_from_db(registration_date, registered_username, REGISTRATION_DATE) )
 	{
 		if ( response_struct )
 			free(response_struct);
-	
+
 		fprintf(stderr, "[%s] %s [5] In function \"user_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 		return NULL;
 	}
 	strcpy(response_struct->regdate, registration_date);
-	
+
 
 	/* запись USERNAME */
-	strcpy(response_struct->username, registered_username);	
+	strcpy(response_struct->username, registered_username);
 
-	
+
 	/* Отладочная печать в stdout содержимого получившейся записи перед отправкой клиенту */
 	if ( show_record_flag )
 	{
-		char* args[USER_RECORD_FIELDS_NUM] = 
+		char* args[USER_RECORD_FIELDS_NUM] =
 		{
 			response_struct->username,
 			response_struct->status,
@@ -1334,7 +1329,7 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 	{
 		if ( response_struct )
 			free(response_struct);
-	
+
 		fprintf(stderr, "[%s] %s [1] In function \"debug_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 		return NULL;
@@ -1358,10 +1353,10 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 			strcpy(response_struct->rank, "OLD");
 			break;
 		case 'A':
-			strcpy(response_struct->rank, "ADMIN");		
+			strcpy(response_struct->rank, "ADMIN");
 	}
-			
-	
+
+
 	int i;
 	for ( i = 0; i < serv->sess_array_size; i++ )
 		if ( serv->sess_array[i] )
@@ -1370,7 +1365,7 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 				{
 					const char* status = get_status_str(serv->sess_array[i]->user_status);
 					strcpy(response_struct->status, status);
-					
+
 					itoa(serv->sess_array[i]->ID, response_struct->id, ID_SIZE-1);
 					itoa(serv->sess_array[i]->authorized, response_struct->auth, AUTH_STR_SIZE-1);
 					itoa(serv->sess_array[i]->buf_used, response_struct->used, USED_STR_SIZE-1);
@@ -1382,20 +1377,20 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 
 					itoa(serv->sess_array[i]->sockfd, response_struct->sock, SOCK_STR_SIZE-1);
 					itoa(serv->sess_array[i]->state, response_struct->state, STATE_STR_SIZE-1);
-					
+
 					eval_mute_time_left(serv->sess_array[i]);
 
 					itoa(serv->sess_array[i]->muted, response_struct->muted, MUTED_SIZE-1);
 					itoa(serv->sess_array[i]->mute_time, response_struct->mute_time, MUTE_TIME_SIZE-1);
 					itoa(serv->sess_array[i]->mute_time_left, response_struct->mute_time_left, MUTE_TIME_LEFT_SIZE-1);
 					itoa(serv->sess_array[i]->start_mute_time, response_struct->start_mute_time, START_MUTE_TIME_SIZE-1);
-					
+
 					char rank[RANK_SIZE];
 					set_user_rank(serv->sess_array[i]);
 					rank[0] = get_user_rank(serv->sess_array[i]->rank);
 					rank[1] = '\0';
 
-					const char* query_strings[] = 
+					const char* query_strings[] =
 					{
 									"DB_WRITELINE|",
 									registered_username,
@@ -1414,12 +1409,12 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 									"undefined",
 									NULL
 					};
-					
+
 					if ( !write_query_into_db(query_strings) )
 					{
 						return NULL;
 					}
-			
+
 					break;
 				}
 
@@ -1428,12 +1423,12 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 		const char* offline = "offline";
 		memcpy(response_struct->status, offline, strlen(offline)+1);
 
-		if ( 
+		if (
 				!get_field_from_db(response_struct->id, registered_username, ID)							||
 				!get_field_from_db(response_struct->last_date_in, registered_username, LAST_DATE_IN)		||
 				!get_field_from_db(response_struct->last_ip, registered_username, LAST_IP)					||
 				!get_field_from_db(response_struct->regdate, registered_username, REGISTRATION_DATE)		||
-				!get_field_from_db(response_struct->pass, registered_username, PASS)						||	
+				!get_field_from_db(response_struct->pass, registered_username, PASS)						||
 				!get_field_from_db(response_struct->muted, registered_username, MUTED)						||
 				!get_field_from_db(response_struct->mute_time, registered_username, MUTE_TIME)				||
 				!get_field_from_db(response_struct->mute_time_left, registered_username, MUTE_TIME_LEFT)	||
@@ -1442,12 +1437,12 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 		{
 			if ( response_struct )
 				free(response_struct);
-		
+
 			fprintf(stderr, "[%s] %s [2] In function \"debug_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
 			session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 			return NULL;
 		}
-		
+
 		response_struct->auth[0] = '0';
 		response_struct->auth[1] = '\0';
 	}
@@ -1455,7 +1450,7 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 
 	if ( show_record_flag )
 	{
-		char* args[DEBUG_RECORD_FIELDS_NUM] = 
+		char* args[DEBUG_RECORD_FIELDS_NUM] =
 		{
 			response_struct->username,
 			response_struct->id,
@@ -1495,14 +1490,14 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 	char success_string[BUFSIZE] = { 0 };
 	const char* success_code = "*RECORD_COMMAND_SUCCESS|";
 
-	
+
 	int len = strlen(success_code);
 	int cur_pos = len;
 	strncat(success_string, success_code, len);
 
 	len = strlen(type);
 	cur_pos += len;
-	strncat(success_string, type, len);	
+	strncat(success_string, type, len);
 	success_string[cur_pos] = '|';
 	cur_pos++;
 
@@ -1513,8 +1508,8 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 		{
 			return;
 		}
-		
-		const char* args[] = 
+
+		const char* args[] =
 		{
 				"10",
 				response->username,
@@ -1525,7 +1520,7 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 				response->regdate,
 				response->quote
 		};
-		
+
 		int i;
 		for ( i = 0; i < USER_RECORD_FIELDS_NUM+1; i++ )
 		{
@@ -1535,7 +1530,7 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 			success_string[cur_pos] = '|';
 			cur_pos++;
 		}
-		
+
 		success_string[cur_pos-1] = '\n';
 		success_string[cur_pos] = '\0';
 
@@ -1548,8 +1543,8 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 		{
 			return;
 		}
-		
-		const char* args[] = 
+
+		const char* args[] =
 		{
 				"20",
 				response->username,
@@ -1570,7 +1565,7 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 				response->mute_time_left,
 				response->start_mute_time
 		};
-		
+
 		int i;
 		for ( i = 0; i < DEBUG_RECORD_FIELDS_NUM+1; i++ )
 		{
@@ -1580,7 +1575,7 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 			success_string[cur_pos] = '|';
 			cur_pos++;
 		}
-		
+
 		success_string[cur_pos-1] = '\n';
 		success_string[cur_pos] = '\0';
 
@@ -1596,9 +1591,9 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
 		return;
-	
+
 	if ( args_num > 3 )
-	{	
+	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|TOO_MUCH_ARGS\n");
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
@@ -1607,22 +1602,22 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		}
 		return;
 	}
-	
+
 
 	char buffer_param[100];
 	char buffer_param_value[100];
 	if ( (args_num == 2) || (args_num == 3) )
-	{	
+	{
 		int len = strlen(cmd_args[1]);
-		memcpy(buffer_param, cmd_args[1], len+1); 
-		
+		memcpy(buffer_param, cmd_args[1], len+1);
+
 		if ( args_num == 3 )
 		{
 			len = strlen(cmd_args[2]);
 			memcpy(buffer_param_value, cmd_args[2], len+1);
 		}
 	}
-	
+
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"record_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -1635,20 +1630,20 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		send_record_response(sess, sess->login, "record");
 	}
 	else if ( args_num == 2 )
-	{	
+	{
 		char response[BUFFER_SIZE];
 		if ( read_query_from_db(response, buffer_param) == -1 )
 		{
 			session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 			return;
 		}
-		
+
 		char rank[RANK_SIZE];
 		if ( !get_field_from_db(rank, buffer_param, RANK))
 		{
 			return;
 		}
-		
+
 		if ( rank[0] == 'A' )
 		{
 			if ( sess->rank != ADMIN_RANK_VALUE )
@@ -1658,7 +1653,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 			}
 		}
 
-		send_record_response(sess, buffer_param, "record");			
+		send_record_response(sess, buffer_param, "record");
 	}
 	else if ( args_num == 3 )
 	{
@@ -1711,7 +1706,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				if ( !is_correct_symbol )
 					break;
 			}
-			
+
 			/* обновляем данные по ключу sess->login в таблице БД, т.к пользователь изменил содержимое своей записи */
 			if ( is_correct_symbol && (j < REALNAME_SIZE) )
 			{
@@ -1725,7 +1720,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 				if ( sess->muted )
 					eval_mute_time_left(sess);
-			
+
 				char smt[START_MUTE_TIME_SIZE];
 				if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
 				{
@@ -1746,11 +1741,11 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 					return;
 				}
 				sess->muted = atoi(muted);
-				
+
 				char mtl[MUTE_TIME_LEFT_SIZE];
 				itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
-				const char* query_strings[] = 
+				const char* query_strings[] =
 				{
 								"DB_WRITELINE|",
 								sess->login,
@@ -1769,18 +1764,18 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								"undefined",
 								NULL
 				};
-				
+
 				if ( !write_query_into_db(query_strings) )
 				{
 					return;
 				}
-				
+
 				/* Данные были успешно обновлены */
 			}
 		}
 		/* отправитель команды /record хочет изменить в своей записи поле AGE */
 		else if ( strcmp(buffer_param, valid_params[AGE]) == 0 )
-		{	
+		{
 			/* проверка корректности нового значения поля AGE */
 			int age = atoi(buffer_param_value);
 
@@ -1797,7 +1792,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 				if ( sess->muted )
 					eval_mute_time_left(sess);
-			
+
 				char smt[START_MUTE_TIME_SIZE];
 				if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
 				{
@@ -1818,11 +1813,11 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 					return;
 				}
 				sess->muted = atoi(muted);
-				
+
 				char mtl[MUTE_TIME_LEFT_SIZE];
 				itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
-				const char* query_strings[] = 
+				const char* query_strings[] =
 				{
 								"DB_WRITELINE|",
 								sess->login,
@@ -1841,7 +1836,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								"undefined",
 								NULL
 				};
-				
+
 				if ( !write_query_into_db(query_strings) )
 				{
 					return;
@@ -1873,7 +1868,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				if ( !is_correct_symbol )
 					break;
 			}
-	
+
 			/* обновляем данные по ключу sess->login в таблице БД, т.к пользователь изменил содержимое своей записи */
 			if ( is_correct_symbol && (j < QUOTE_SIZE) )
 			{
@@ -1887,7 +1882,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 				if ( sess->muted )
 					eval_mute_time_left(sess);
-			
+
 				char smt[START_MUTE_TIME_SIZE];
 				if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
 				{
@@ -1908,11 +1903,11 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 					return;
 				}
 				sess->muted = atoi(muted);
-				
+
 				char mtl[MUTE_TIME_LEFT_SIZE];
 				itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
-				const char* query_strings[] = 
+				const char* query_strings[] =
 				{
 								"DB_WRITELINE|",
 								sess->login,
@@ -1931,7 +1926,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								"undefined",
 								NULL
 				};
-				
+
 				if ( !write_query_into_db(query_strings) )
 				{
 					return;
@@ -1940,7 +1935,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				/* Данные были успешно обновлены */
 			}
 		}
-			
+
 		if ( !valid_param_flag )
 			session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|INCORRECT_STRING_VALUE\n");
 	}
@@ -1958,7 +1953,7 @@ static void send_mute_response(ClientSession* sess, const char* username)
 	int len = strlen(msg_to_victim);
 	int pos = len;
 	memcpy(response_to_victim, msg_to_victim, len+1);
-	
+
 	int j;
 	for ( j = 0; j < serv->sess_array_size; j++ )
 		if ( serv->sess_array[j] )
@@ -1966,10 +1961,10 @@ static void send_mute_response(ClientSession* sess, const char* username)
 				break;
 	int index = j;
 
-		
+
 	char mt[MUTE_TIME_LEFT_SIZE];
 	itoa(serv->sess_array[index]->mute_time_left, mt, MUTE_TIME_LEFT_SIZE-1);
-	
+
 	int mt_len = strlen(mt);
 	pos += mt_len;
 	strncat(response_to_victim, mt, mt_len);
@@ -1978,7 +1973,6 @@ static void send_mute_response(ClientSession* sess, const char* username)
 	response_to_victim[pos] = '\0';
 
 	session_send_string(serv->sess_array[index], response_to_victim);
-	
 
 
 	const char* mute_success = "*MUTE_COMMAND_SUCCESS|";
@@ -1988,7 +1982,7 @@ static void send_mute_response(ClientSession* sess, const char* username)
 	pos = len;
 	memcpy(response_sender, mute_success, len+1);
 
-	
+
 	len = strlen(username);
 	pos += len;
 	strncat(response_sender, username, len);
@@ -2030,11 +2024,11 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	if ( (sess == NULL) || (cmd_args == NULL) )
 		return;
-	
+
 	if ( args_num != 3 )
-	{	
+	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|TOO_MUCH_ARGS\n");
-		
+
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
 			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"mute_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -2042,14 +2036,14 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		}
 		return;
 	}
-	
+
 
 	char username_buf[LOGIN_SIZE];
 	memcpy(username_buf, cmd_args[1], strlen(cmd_args[1]) + 1);
-	
+
 	char time_val[START_MUTE_TIME_SIZE];
 	memcpy(time_val, cmd_args[2], strlen(cmd_args[2]) + 1);
-	
+
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"mute_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -2076,13 +2070,13 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		}
 		users_list = users_list->next;
 	}
-	
+
 	if ( !is_online )
-	{	
+	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|USER_OFFLINE\n");
 		return;
 	}
-	
+
 	char muted[MUTED_SIZE];
 	if ( !get_field_from_db(muted, username_buf, MUTED) )
 	{
@@ -2091,7 +2085,7 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	int is_muted = atoi(muted);
 	if ( is_muted )
-	{	
+	{
 		session_send_string(sess, "*MUTE_COMMAND_USER_ALREADY_MUTED\n");
 		return;
 	}
@@ -2102,7 +2096,7 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|INCORRECT_TIME_RANGE\n");
 		return;
 	}
-	
+
 	int i;
 	for ( i = 0; i < serv->sess_array_size; i++)
 	{
@@ -2115,24 +2109,24 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				serv->sess_array[i]->mute_time_left = mute_time;
 				time_t t = time(0);
 				serv->sess_array[i]->start_mute_time = t;
-				
+
 				char rank[RANK_SIZE];
 				set_user_rank(serv->sess_array[i]);
 				rank[0] = get_user_rank(serv->sess_array[i]->rank);
 				rank[1] = '\0';
 
 				itoa(serv->sess_array[i]->muted, muted, MUTED_SIZE-1);
-				
+
 				char smt[START_MUTE_TIME_SIZE];
 				itoa(serv->sess_array[i]->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
-				
+
 				char mt[MUTE_TIME_SIZE];
 				itoa(serv->sess_array[i]->mute_time, mt, MUTE_TIME_SIZE-1);
-				
+
 				char mtl[MUTE_TIME_LEFT_SIZE];
 				itoa(serv->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
-				const char* query_strings[] = 
+				const char* query_strings[] =
 				{
 								"DB_WRITELINE|",
 								username_buf,
@@ -2151,7 +2145,7 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								"undefined",
 								NULL
 				};
-				
+
 				if ( !write_query_into_db(query_strings) )
 				{
 					return;
@@ -2161,7 +2155,7 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 			}
 		}
 	}
-		
+
 	send_mute_response(sess, username_buf);
 }
 
@@ -2175,7 +2169,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	if ( args_num != 2 )
 	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|UNMUTE|TOO_MUCH_ARGS\n");
-		
+
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
 			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"unmute_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -2187,33 +2181,33 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	char username_buf[LOGIN_SIZE];
 	memcpy(username_buf, cmd_args[1], strlen(cmd_args[1])+1);
-	
+
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"unmute_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 		cmd_args = NULL;
 	}
 
-	
+
 	if ( strcmp(sess->login, username_buf) == 0 )
 	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|UNMUTE|SELF_USE\n");
 		return;
 	}
-	
+
 	char muted[MUTED_SIZE];
 	if ( !get_field_from_db(muted, username_buf, MUTED) )
 	{
 		return;
 	}
-	
+
 	int is_muted = atoi(muted);
 	if ( !is_muted )
-	{	
+	{
 		session_send_string(sess, "*UNMUTE_COMMAND_USER_NOT_MUTED\n");
 		return;
 	}
-	
+
 	int i;
 	for ( i = 0; i < serv->sess_array_size; i++ )
 	{
@@ -2232,17 +2226,17 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 				rank[1] = '\0';
 
 				itoa(serv->sess_array[i]->muted, muted, MUTED_SIZE-1);
-				
+
 				char smt[START_MUTE_TIME_SIZE];
 				itoa(serv->sess_array[i]->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
-				
+
 				char mt[MUTE_TIME_SIZE];
 				itoa(serv->sess_array[i]->mute_time, mt, MUTE_TIME_SIZE-1);
-				
+
 				char mtl[MUTE_TIME_LEFT_SIZE];
 				itoa(serv->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
-				const char* query_strings[] = 
+				const char* query_strings[] =
 				{
 								"DB_WRITELINE|",
 								username_buf,
@@ -2261,7 +2255,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 								"undefined",
 								NULL
 				};
-				
+
 				if ( !write_query_into_db(query_strings) )
 				{
 					return;
@@ -2291,7 +2285,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 {
-	char cur_time[CUR_TIME_SIZE];	
+	char cur_time[CUR_TIME_SIZE];
 
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
 		return;
@@ -2299,7 +2293,7 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	if ( args_num != 2 )
 	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|KICK|TOO_MUCH_ARGS\n");
-		
+
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
 			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"kick_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -2310,13 +2304,13 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	char username_buf[LOGIN_SIZE];
 	memcpy(username_buf, cmd_args[1], strlen(cmd_args[1])+1);
-	
+
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"kick_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 		cmd_args = NULL;
 	}
-	
+
 	StringList* users_list = clients_online;
 	int is_online = 0;
 	while ( users_list )
@@ -2336,13 +2330,13 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		}
 		users_list = users_list->next;
 	}
-	
+
 	if ( !is_online )
-	{	
+	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|KICK|USER_OFFLINE\n");
 		return;
 	}
-	
+
 	int i;
 	for ( i = 0; i < serv->sess_array_size; i++ )
 	{
@@ -2356,7 +2350,7 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 			}
 		}
 	}
-	
+
 	const char* str = "*KICK_COMMAND_SUCCESS|SENDER|";
 	char response[100];
 
@@ -2375,8 +2369,8 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 }
 
 void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
-{	
-	char cur_time[CUR_TIME_SIZE];	
+{
+	char cur_time[CUR_TIME_SIZE];
 
 	if ( (sess == NULL) || (cmd_args == NULL) )
 		return;
@@ -2384,7 +2378,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	if ( args_num != 2 )
 	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|TABLE|TOO_MUCH_ARGS\n");
-		
+
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
 			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"table_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -2393,7 +2387,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 		return;
 	}
-	
+
 
 	char buffer_value[100];
 	memcpy(buffer_value, cmd_args[1], strlen(cmd_args[1]) + 1);
@@ -2416,7 +2410,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		char answer[BUFFER_SIZE];
 		const char* table_cmd_success = "*TABLE_COMMAND_SUCCESS|LIST|";
 		int pos = strlen(table_cmd_success);
-		
+
 		strcpy(answer, table_cmd_success);
 		pos += strlen(cfg.userinfo_filename);
 
@@ -2436,7 +2430,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	int is_userdata = (strcmp(buffer_value, cfg.userinfo_filename) == 0) ? 1 : 0;
 	int is_session_userinfo = (strcmp(buffer_value, cfg.usersessions_filename) == 0) ? 1 : 0;
-	
+
 	if ( (!is_userdata) && (!is_session_userinfo) )
 	{
 		session_send_string(sess, "*COMMAND_INVALID_PARAMS|TABLE|INCORRECT_STRING_VALUE\n");
@@ -2445,9 +2439,9 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	const char* resp_start = "*TABLE_COMMAND_SUCCESS|DATA|";
 	char response_buffer[BUFSIZE] = { 0 };
-	
+
 	int pos = strlen(resp_start);
-	strcpy(response_buffer, resp_start);	
+	strcpy(response_buffer, resp_start);
 
 	char table_size[10];
 	itoa(cfg.records_num, table_size, 9);
@@ -2466,7 +2460,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	{
 		char key[10];
 		itoa(i, key, 9);
-		
+
 		char id[ID_SIZE];
 		if ( !get_field_from_db(id, key, ID) )
 		{
@@ -2495,13 +2489,13 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		{
 			char key[10];
 			itoa(i, key, 9);
-			
+
 			char id[ID_SIZE];
 			if ( !get_field_from_db(id, key, ID) )
 			{
 				continue;
 			}
-		
+
 			char username[LOGIN_SIZE];
 			if ( !get_field_from_db(username, key, USERNAME) )
 			{
@@ -2521,7 +2515,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 			}
 
 			enum { ARGS = 4 };
-			const char* args[ARGS] = 
+			const char* args[ARGS] =
 			{
 					id,
 					username,
@@ -2552,13 +2546,13 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		{
 			char key[10];
 			itoa(i, key, 9);
-			
+
 			char id[ID_SIZE];
 			if ( !get_field_from_db(id, key, ID) )
 			{
 				continue;
 			}
-			
+
 			char registration_date[REG_DATE_SIZE];
 			if ( !get_field_from_db(registration_date, key, REGISTRATION_DATE) )
 			{
@@ -2592,7 +2586,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 					ldo,
 					last_ip
 			};
-			
+
 			int j;
 			for ( j = 0; j < ARGS; j++ )
 			{
@@ -2608,7 +2602,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	response_buffer[pos-1] = '\n';
 	response_buffer[pos] = '\0';
-	
+
 	session_send_string(sess, response_buffer);
 }
 
@@ -2616,7 +2610,7 @@ void ban_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 {
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
 		return;
-	
+
 	char cur_time[CUR_TIME_SIZE];
 
 	if ( !clear_cmd_args(cmd_args, args_num) )
@@ -2632,7 +2626,7 @@ void unban_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 {
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
 		return;
-	
+
 	char cur_time[CUR_TIME_SIZE];
 
 	if ( !clear_cmd_args(cmd_args, args_num) )
@@ -2664,12 +2658,12 @@ static void draw_line(int line_length, int c)
 }
 
 void view_data(const char* str, int str_size, char mode, int line_length)
-{	
+{
 	char cur_time[CUR_TIME_SIZE];
 
 	if ( line_length >= str_size )
 		line_length = str_size-1;
-	
+
 	draw_line(line_length, 0);
 
 	int k;
@@ -2695,7 +2689,7 @@ void view_data(const char* str, int str_size, char mode, int line_length)
 			return;
 		}
 	}
-	
+
 	draw_line(line_length, 1);
 }
 
@@ -2746,7 +2740,7 @@ void text_message_handler(ClientSession *sess, const char *msg, int is_private, 
 		str[cur_pos] = sess->login[j];
 	str[cur_pos] = '|';
 	cur_pos++;
-	
+
 
 	for ( i = 0; i < SERVER_CODES_COUNT; i++ )
 	{
@@ -2756,7 +2750,7 @@ void text_message_handler(ClientSession *sess, const char *msg, int is_private, 
 			int sub_str_len = strlen(sub_str);
 			int idx = buf_len - sub_str_len;
 			int code_len = strlen(server_codes_list[i]);
-			
+
 			int k;
 			for ( k = idx; k < (idx+code_len); k++ )
 				buf[k] = ' ';
@@ -2771,10 +2765,10 @@ void text_message_handler(ClientSession *sess, const char *msg, int is_private, 
 		if ( buf[j] == ' ' )
 		{
 			buffer_str[k] = ' ';
-			for ( ; buf[j] == ' '; j++ ) 
+			for ( ; buf[j] == ' '; j++ )
 				{ }
-			
-			if ( buf[j] != ' ' ) 
+
+			if ( buf[j] != ' ' )
 				j--;
 		}
 		else
@@ -2782,14 +2776,14 @@ void text_message_handler(ClientSession *sess, const char *msg, int is_private, 
 	}
 	buffer_str[k] = '\0';
 
-	
+
 	for ( j = 0; buffer_str[j]; j++, cur_pos++ )
 		str[cur_pos] = buffer_str[j];
 	str[cur_pos] = '\n';
 	cur_pos++;
 	str[cur_pos] = '\0';
 	cur_pos++;
-	
+
 	free(buffer_str);
 
 	int mes_size = strlen(str)+1;
@@ -2805,14 +2799,14 @@ void text_message_handler(ClientSession *sess, const char *msg, int is_private, 
 				if ( strcmp(serv->sess_array[i]->login, adresat) != 0 )
 					continue;
 
-				int bytes_sent = write(i, str, mes_size); 
+				int bytes_sent = write(i, str, mes_size);
 				printf("[%s] %s Sent %d bytes to %s\n", get_time_str(cur_time, CUR_TIME_SIZE), INFO_MESSAGE_TYPE, bytes_sent, serv->sess_array[i]->last_ip);
 				view_data(str, bytes_sent, 'c', 50);
 				view_data(str, bytes_sent, 'd', 50);
 				break;
 			}
 
-			int bytes_sent = write(i, str, mes_size); 
+			int bytes_sent = write(i, str, mes_size);
 			printf("[%s] %s Sent %d bytes to %s\n", get_time_str(cur_time, CUR_TIME_SIZE), INFO_MESSAGE_TYPE, bytes_sent, serv->sess_array[i]->last_ip);
 			view_data(str, bytes_sent, 'c', 50);
 			view_data(str, bytes_sent, 'd', 50);
@@ -2826,7 +2820,7 @@ char** is_received_message_command(const char* msg, int* cmd_num, int* args_num)
 	char aux_buf[BUFSIZE];
 	char** cmd_args;
 	*args_num = 0;
-	
+
 	memcpy(buf, msg, strlen(msg)+1);
 	memcpy(aux_buf, buf, strlen(buf)+1);
 
@@ -2898,7 +2892,7 @@ char** is_received_message_command(const char* msg, int* cmd_num, int* args_num)
 				char buffer_command[100];
 				char buffer_name[100];
 				char buffer_message[BUFSIZE];
-				
+
 				const char* args[] =
 				{
 						buffer_command,
@@ -2909,7 +2903,7 @@ char** is_received_message_command(const char* msg, int* cmd_num, int* args_num)
 
 				memcpy(buffer_command, cmd_args[0], strlen(cmd_args[0])+1);
 				memcpy(buffer_name, cmd_args[1], strlen(cmd_args[1])+1);
-	
+
 				int k = 0;
 				int j;
 				int i;
@@ -2929,16 +2923,16 @@ char** is_received_message_command(const char* msg, int* cmd_num, int* args_num)
 				for ( i = 0; i < *args_num; i++ )
 					free(cmd_args[i]);
 				free(cmd_args);
-				
+
 
 				*args_num = 3;
 				cmd_args = malloc(sizeof(char*) * (*args_num));
-				
+
 				for ( i = 0; i < *args_num; i++ )
 				{
 					int str_len = strlen(args[i]);
 					cmd_args[i] = malloc(sizeof(char) * str_len + 1);
-					memcpy(cmd_args[i], args[i], str_len + 1);		
+					memcpy(cmd_args[i], args[i], str_len + 1);
 				}
 			}
 			return cmd_args;
@@ -2983,7 +2977,7 @@ char** is_received_message_command(const char* msg, int* cmd_num, int* args_num)
 			*cmd_num = CMD_CODE_COMMAND_UNBAN;
 			return cmd_args;
 		}
-	
+
 		for ( i = 0; i < *args_num; i++ )
 			free(cmd_args[i]);
 		free(cmd_args);

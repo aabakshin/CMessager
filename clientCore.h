@@ -1,9 +1,3 @@
-/*
- * Модуль clientCore содержит функции для инициализации соединения, 
- * а также обработки серверных ответтов
- 
- */
-
 #ifndef CLIENTCORE_H_SENTRY
 #define CLIENTCORE_H_SENTRY
 
@@ -18,7 +12,6 @@ enum
 	HISTORY_COMMANDS_LIST_SIZE		=			  5
 };
 
-/* Следующие константы используются для настройки чувствительности антиспам модуля */
 enum
 {
 	ANTISPAM_MODULE_TRIES_NUMBER			=			   2,

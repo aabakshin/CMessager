@@ -1,5 +1,3 @@
-/* Модуль запуска сервера */
-
 #include "serverCore.h"
 #include "Commons.h"
 #include "DateTime.h"

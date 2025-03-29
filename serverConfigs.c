@@ -267,8 +267,6 @@ char** parse_configuration_file(int* strings_count)
 	}
 	if ( cfg_ptr )
 		fclose(cfg_ptr);
-
-	/*	printf("*config_strings = %p\n", config_strings);	*/
 	
 	return config_strings;
 }

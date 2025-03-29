@@ -1,5 +1,3 @@
-/* Файл реализации модуля StringList */
-
 #ifndef STRINGLIST_C_SENTRY
 #define STRINGLIST_C_SENTRY
 

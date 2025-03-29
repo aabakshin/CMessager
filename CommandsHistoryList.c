@@ -1,5 +1,3 @@
-/* Файл реализации модуля CommandsHistoryList */
-
 #ifndef COMMAND_HISTORY_LIST_C
 #define COMMAND_HISTORY_LIST_C
 
@@ -7,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
 
 int chl_print(CommandsHistoryList* node)
 {
@@ -190,18 +189,9 @@ int chl_clear(CommandsHistoryList** nodePtr)
 	CommandsHistoryList* node = *nodePtr;
 	int size = chl_get_size(node);
 	
-	/*int result;*/
 	int i;
 	for ( i = 1; i <= size; i++ )
 		chl_delete(nodePtr, (*nodePtr)->number);
-
-		/*if ( (result = chl_delete(nodePtr, (*nodePtr)->number)) )
-			printf("Deleted node #%d\n", result);
-		else
-			printf("Node #%d does not exist in the list!\n", (*nodePtr)->number);*/
-
-	/*if ( chl_is_empty(*nodePtr) )
-		printf("%s", "List has been cleared.\n");*/
 
 	return 1;
 }

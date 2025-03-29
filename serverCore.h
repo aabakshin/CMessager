@@ -6,10 +6,6 @@
 #define SERVER_DB_ADDR			"192.168.50.128"
 #define SERVER_DB_PORT			"7778"
 
-enum
-{
-	SECRET_NUMBER				=			 900
-};
 
 /*A format of parsed table record from server database */
 enum
@@ -43,6 +39,11 @@ enum fsm_states
 	fsm_wait_message,
 	fsm_finish,
 	fsm_error
+};
+
+enum
+{
+	SECRET_NUMBER				=			 900
 };
 
 enum status 
@@ -123,6 +124,5 @@ int get_field_from_db(char* field, const char* search_key, int field_code);
 int server_init(int port);
 void server_close_session(int sock_num);
 int server_running(void);                    
-
 
 #endif

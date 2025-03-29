@@ -1,5 +1,3 @@
-/* Модуль DateTime предоставляет функции для удобного вывода системного времении даты */
-
 #ifndef DATETIME_H_SENTRY
 #define DATETIME_H_SENTRY
 

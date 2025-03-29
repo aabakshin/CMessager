@@ -1,5 +1,3 @@
-/* Реализация модуля serverDatabase */
-
 #ifndef SERVERDATABASE_C_SENTRY
 #define SERVERDATABASE_C_SENTRY
 
@@ -15,7 +13,7 @@ static int exit_flag = 0;
 static int sig_number = 0;
 
 enum
-{ 
+{
 		QUEUE_SOCK_LEN					=			 16,
 		MAX_TOKENS_IN_MESSAGE			=			100,
 		WRITE_LINE_TOKENS				=			 15,
@@ -31,7 +29,7 @@ enum
 		DB_WRITELINE
 };
 
-const char* db_commands_names[] = 
+const char* db_commands_names[] =
 {
 			"INIT_TABLES",
 			"DB_READLINE",
@@ -52,7 +50,7 @@ void stop_handler(int signo)
 {
 	int save_errno = errno;
 	signal(SIGINT, stop_handler);
-	
+
 	sig_number = signo;
 	exit_flag = 1;
 
@@ -63,7 +61,7 @@ void stop_handler(int signo)
 static int db_session_do_read(Server* serv_ptr, Session* sess)
 {
 	char cur_time[CURRENT_TIME_SIZE];
-	
+
 	if ( serv_ptr == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_session_do_read\" \"serv_ptr\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
@@ -79,7 +77,7 @@ static int db_session_do_read(Server* serv_ptr, Session* sess)
 
 	int rc = read(sess->data->fd, sess->data->buf, BUFSIZE);
 	printf("[%s] %s Received %d bytes from %s => ", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, rc, sess->data->addr);
-	
+
 	if ( rc < 1 )
 	{
 		printf("%s\n", "()");
@@ -93,7 +91,7 @@ static int db_session_do_read(Server* serv_ptr, Session* sess)
 		fprintf(stderr, "[%s] %s Client's(%s) line is too long!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sess->data->addr);
 		return 0;
 	}
-	
+
 	db_session_check_lf(serv_ptr, sess);
 
 	return 1;
@@ -167,7 +165,7 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 	}
 
 	if ( client_line == NULL )
-	{	
+	{
 		fprintf(stderr, "[%s] %s In function \"db_session_message_handler\" \"client_line\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return;
 	}
@@ -204,14 +202,14 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 	{
 		char records_num_buf[100];
 		int len = strlen(mes_tokens[1]);
-		
+
 		if ( len >= 100 )
 			len = 99;
 
 		memcpy(records_num_buf, mes_tokens[1], len);
 		records_num_buf[len] = '\0';
 		int records_num = atoi(records_num_buf);
-		
+
 
 		char usersinfo_name[100];
 		len = strlen(mes_tokens[2]);
@@ -231,11 +229,11 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 
 		memcpy(usersessions_name, mes_tokens[3], len);
 		usersessions_name[len] = '\0';
-		
+
 
 		int ret_value1 = db_create_userinfo_table(records_num, usersinfo_name);
 		int ret_value2 = db_create_usersessions_table(records_num, usersessions_name);
-		
+
 		const char* msg_to_send = NULL;
 		if ( ret_value1 && ret_value2 )
 		{
@@ -246,7 +244,7 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 		}
 		else
 			msg_to_send = "DB_INITIALIZATION_ERROR\n";
-		
+
 		len = strlen(msg_to_send);
 		int wc = write(sess->data->fd, msg_to_send, len);
 		printf("[%s] %s Sent %d\\%d bytes to %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, sess->data->addr);
@@ -255,7 +253,7 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 	{
 		char search_key[100];
 		int len = strlen(mes_tokens[1]);
-		
+
 		if ( len >= 100 )
 			len = 99;
 
@@ -273,7 +271,7 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 
 			return;
 		}
-		
+
 		msg_to_send = "DB_LINE_EXIST|";
 		char send_buf[BUFFER_SIZE] = { 0 };
 		len = strlen(msg_to_send);
@@ -302,9 +300,9 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 			printf("[%s] %s Sent %d\\%d bytes to %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, sess->data->addr);
 
 			return;
-		}		
+		}
 
-		int index = db_get_record_index_by_name(mes_tokens[1], serv_ptr->userinfo_table_name);
+		int index = db_get_record_index(mes_tokens[1], serv_ptr->userinfo_table_name);
 		if ( index < 0 )
 		{
 			if ( db_userinfo_table_is_full(serv_ptr->userinfo_table_name) )
@@ -315,7 +313,7 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 				{
 					index = serv_ptr->db_records_num;
 					serv_ptr->db_records_num *= 2;
-					
+
 					const char* msg_to_send = "DB_UPDATE_TABLE_SUCCESS|";
 					char send_buf[BUFFER_SIZE] = { 0 };
 					int pos = strlen(msg_to_send);
@@ -338,9 +336,9 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 					struct timeval tv;
 					tv.tv_sec = 0;
 					tv.tv_usec = MSG_SYN_TIMER_MS;
-					
+
 					int tries = MSG_SYN_TRIES_CNT;
-					while ( tries > 0 ) 
+					while ( tries > 0 )
 					{
 						fd_set r;
 						FD_ZERO(&r);
@@ -352,17 +350,17 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 							fprintf(stderr, "[%s] %s Unable to get synchronize message from app server [%s]\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, (ret_val == 0) ? "Timeout error" : "select() error");
 							if ( ret_val == -1 )
 								fprintf(stderr, "[%s] %s errno value = %d\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, errno);
-							
+
 							printf("[%s] %s Tries number: %d\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, tries);
-							
+
 							int wc = write(sess->data->fd, send_buf, pos+1);
 							printf("[%s] %s Sent %d\\%d bytes to %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, pos+1, sess->data->addr);
-							
+
 							tries--;
 
 							continue;
 						}
-						
+
 						if ( FD_ISSET(sess->data->fd, &r) )
 						{
 							char buffer[100];
@@ -373,10 +371,10 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 							{
 								fprintf(stderr, "[%s] %s Invalid synchronize message!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 								printf("[%s] %s Tries number: %d\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, tries);
-							
+
 								int wc = write(sess->data->fd, send_buf, pos+1);
 								printf("[%s] %s Sent %d\\%d bytes to %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, pos+1, sess->data->addr);
-								
+
 								tries--;
 
 								continue;
@@ -385,11 +383,11 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 							break;
 						}
 					}
-					
+
 					if ( !synchro_success )
 					{
 						fprintf(stderr, "[%s] %s Failed synchronize with peer [%s].\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sess->data->addr);
-						
+
 						const char* msg_to_send = "DB_SYNCHRONIZE_ERROR\n";
 						int len = strlen(msg_to_send);
 						int wc = write(sess->data->fd, msg_to_send, len);
@@ -405,7 +403,7 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 					int len = strlen(msg_to_send);
 					int wc = write(sess->data->fd, msg_to_send, len);
 					printf("[%s] %s Sent %d\\%d bytes to %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, sess->data->addr);
-					
+
 					return;
 				}
 			}
@@ -414,7 +412,7 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 				index = db_get_new_record_index(serv_ptr->userinfo_table_name);
 			}
 		}
-		
+
 		char write_line[BUFFER_SIZE] = { 0 };
 
 		int pos = 0;
@@ -425,7 +423,7 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 		pos += len;
 		write_line[pos] = '|';
 		pos++;
-		
+
 		int i;
 		for ( i = 1; i < WRITE_LINE_TOKENS; i++ )
 		{
@@ -455,7 +453,7 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 	else
 	{
 		fprintf(stderr, "[%s] %s In function \"db_session_message_handler\" \"client_line\" has invalid command value\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		
+
 		const char* msg_to_send = "DB_UNKNOWN_COMMAND\n";
 		int len = strlen(msg_to_send);
 		int wc = write(sess->data->fd, msg_to_send, len);
@@ -466,13 +464,13 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 static Session* db_get_session_by_fd(Server* serv_ptr, int fd)
 {
 	char cur_time[CURRENT_TIME_SIZE];
-	
+
 	if ( serv_ptr == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_get_session_by_fd\" \"serv_ptr\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return NULL;
 	}
-	
+
 	if ( fd < 0 )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_get_session_by_fd\" incorrect \"fd\" value!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
@@ -487,7 +485,7 @@ static Session* db_get_session_by_fd(Server* serv_ptr, int fd)
 
 		s_list = s_list->next;
 	}
-		
+
 	return NULL;
 }
 
@@ -506,8 +504,8 @@ int db_server_init(int port)
 	}
 	int opt = 1;
 	setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)); /* Предотвращение "залипания" TCP порта */
-	
-	
+
+
 	printf("[%s] %s Binding socket to local address..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
@@ -526,10 +524,8 @@ int db_server_init(int port)
 		fprintf(stderr, "[%s] %s listen() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
 		return -1;
 	}
-	
 
 	printf("[%s] %s Waiting for connections..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
-
 
 	return listen_sock;
 }
@@ -553,7 +549,7 @@ static int db_server_accept_client(Server* serv_ptr)
 		fprintf(stderr, "[%s] %s accept() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
 		return -1;
 	}
-	
+
 	int ip =  ntohl(addr.sin_addr.s_addr);
 	int port = ntohs(addr.sin_port);
 
@@ -563,7 +559,7 @@ static int db_server_accept_client(Server* serv_ptr)
 		fprintf(stderr, "[%s] %s function \"concat_addr_port\" didn't make correct address!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
-	
+
 	ClientData* data = malloc(sizeof(ClientData));
 	if ( !data )
 	{
@@ -575,12 +571,12 @@ static int db_server_accept_client(Server* serv_ptr)
 		return -1;
 	}
 	data->fd = client_sock;
-	
+
 	int i;
 	for ( i = 0; buf_ip[i]; i++ )
 		data->addr[i] = buf_ip[i];
 	data->addr[i] = '\0';
-	
+
 	memset(data->buf, 0, sizeof(data->buf));
 
 	data->buf_used = 0;
@@ -588,7 +584,7 @@ static int db_server_accept_client(Server* serv_ptr)
 	sess_insert(&serv_ptr->sess_list, data);
 
 	printf("[%s] %s New connection from %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, buf_ip);
-	
+
 	if ( buf_ip )
 		free(buf_ip);
 
@@ -598,8 +594,8 @@ static int db_server_accept_client(Server* serv_ptr)
 static void db_server_close_session(Server* serv_ptr, int sock)
 {
 	char cur_time[CURRENT_TIME_SIZE];
-	
-	
+
+
 	if ( serv_ptr == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_server_close_session\" \"serv_ptr\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
@@ -611,10 +607,10 @@ static void db_server_close_session(Server* serv_ptr, int sock)
 		fprintf(stderr, "[%s] %s In function \"db_server_close_session\" \"sock_num\" is less than 0\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return;
 	}
-	
+
 
 	Session* sess = db_get_session_by_fd(serv_ptr, sock);
-	if ( sess == NULL ) 
+	if ( sess == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_server_close_session\" unable find \"sock\" value in sessions list!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return;
@@ -648,7 +644,7 @@ int db_server_running(Server* serv_ptr)
 		FD_ZERO(&readfds);
 		FD_SET(serv_ptr->ls, &readfds);
 		max_d = serv_ptr->ls;
-		
+
 		Session* sess = serv_ptr->sess_list;
 		while ( sess )
 		{
@@ -695,7 +691,7 @@ int db_server_running(Server* serv_ptr)
 
 		if ( FD_ISSET(serv_ptr->ls, &readfds) )
 			db_server_accept_client(serv_ptr);
-		
+
 		sess = serv_ptr->sess_list;
 		while ( sess != NULL )
 		{

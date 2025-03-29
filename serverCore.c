@@ -105,8 +105,6 @@ int is_valid_auth_str(const char* user_auth_str, int authentication)
 	int i = 0;
 	int j = 0;
 
-	/*printf("user_auth_str = %s\n", user_auth_str);*/
-
 	while ( valid_symbols[j] )
 	{
 		if ( user_auth_str[i] == valid_symbols[j] )
@@ -118,8 +116,6 @@ int is_valid_auth_str(const char* user_auth_str, int authentication)
 		}
 		j++;
 	}
-
-	/*printf("correctSymbols = %d\nauth_str_len = %d\n", correctSymbols, auth_str_len);*/
 
 	if ( correct_symbols == auth_str_len )
 		return 1;
