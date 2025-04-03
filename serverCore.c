@@ -1248,7 +1248,6 @@ int server_init(int port)
 	}
 	printf("[%s] %s Database server has successfully configured.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	
-
 	printf("[%s] %s Waiting for connections..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 
 	return 1;
@@ -1267,7 +1266,6 @@ static int server_accept_client(void)
 		return -1;
 	}
 
-	/* printf("client_sock = %d\n", client_sock); */
 	if ( client_sock >= serv->sess_array_size )
 	{
 		int newlen = serv->sess_array_size + serv->sess_array_size;
