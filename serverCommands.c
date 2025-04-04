@@ -129,7 +129,8 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	char cur_time[CUR_TIME_SIZE];
 	char send_buf[BUFSIZE] = { 0 };
 
-	const char* user_cmd_list[] = {
+	const char* user_cmd_list[] =
+	{
 										"/help - list all valid commands",
 										"/whoih - list all online users",
 										"/changepassword <new_password> - set new password for account",
@@ -137,9 +138,10 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 										"/pm <user> <message> - send private message to user",
 										"/status [status_name/list] - Show your status or set status to your record/show list valid statuses",
 										NULL
-								  };
+	};
 
-	const char* admin_cmd_list[] = {
+	const char* admin_cmd_list[] =
+	{
 										"/help - list all valid commands",
 										"/whoih - list all online users",
 										"/changepassword <new_password> - set new password for account",
@@ -155,7 +157,7 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 										"/op <user> - move user in Admin's group",
 										"/deop <user> - remove user from Admin's group",
 										NULL
-								   };
+	};
 
 	/*const char* server_cmd_list[] = {
 										"/help - list all valid commands",
