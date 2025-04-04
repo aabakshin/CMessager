@@ -193,17 +193,19 @@ static int view_record_success_result(char** response_tokens, int fields_num, in
 	return 1;
 }
 
+
 /* 
  * Обработка терминального ввода в ручном режиме при помощи termios
  * Реализация некоторых возможностей терминала
  * Получение строки из станд.потока ввода через низкоуровненые функции и обработка
  * содержимого с учётом использования многобайтных символов
  */
+
 int get_str(char* buffer, int buffer_size)
 {
 	if ( (buffer == NULL) || (buffer_size < 2) )
 		return -1;
-	
+
 	char read_sym[10] = { 0 };
 	int i = 0;
 	int left_offset = 0;
