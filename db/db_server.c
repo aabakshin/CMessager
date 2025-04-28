@@ -7,13 +7,7 @@ int main(int argc, char** argv)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
-	Server serv;
-	serv.ls = -1;
-	serv.sess_list = NULL;
-	serv.db_records_num = -1;
-
-	clear_screen();
-
+	printf("\033c");
 	if ( argc != 2 )
 	{
 		fprintf(stderr, "[%s] %s Usage: <program_name> <port>\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
@@ -21,19 +15,26 @@ int main(int argc, char** argv)
 	}
 
 	int port_number = atoi(argv[1]);
-	if ( port_number < 1024 )
+	if ( port_number <= 1024 )
 	{
-		fprintf(stderr, "[%s] %s Incorrect port number\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s Incorrect port number\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 2;
 	}
+	
+	InitDbServData srv_data;
+	memset(&srv_data, 0, sizeof(InitDbServData));
 
 	int listen_sock = -1;
-	if ( (listen_sock = db_server_init(port_number)) == -1 )
+	if ( (listen_sock = db_server_init(port_number, &srv_data)) == -1 )
 	{
-		fprintf(stderr, "[%s] %s Unable to initialize server\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s Unable to initialize server\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 3;
 	}
-	serv.ls = listen_sock;
+
+	Server serv;
+	memset(&serv, 0, sizeof(Server));
+	serv.server_data = &srv_data;
+	serv.sess_list = NULL;
 
 	int ret_value = db_server_running(&serv);
 	printf("[%s] %s Finished\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);

@@ -6,7 +6,7 @@ int main(int argc, char** argv)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
-	clear_screen();
+	printf("\033c"); /* clear the screen for VT100 terminal */
 
 	if ( argc != 2 )
 	{

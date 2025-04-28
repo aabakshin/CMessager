@@ -12,14 +12,23 @@ enum
 typedef struct
 {
 	int ls;
+	FILE* cfg_fd;
+	FILE* user_table_fd;
+	FILE* sess_table_fd;
 	int db_records_num;
-	char userinfo_table_name[STR_BUF_SIZE];
-	char usersessions_table_name[STR_BUF_SIZE];
+	char user_table_name[STR_BUF_SIZE];
+	char sess_table_name[STR_BUF_SIZE];
+
+} InitDbServData;
+
+typedef struct
+{
+	InitDbServData* server_data; 
 	Session* sess_list;
 } Server;
 
 
-int db_server_init(int port);
+int db_server_init(int port, InitDbServData* server_data);
 int db_server_running(Server* serv_ptr);
 
 #endif

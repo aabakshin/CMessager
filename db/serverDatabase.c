@@ -7,6 +7,7 @@
 #include "SessionList.h"
 #include "serverDatabase.h"
 #include "DatabaseMsgHandlers.h"
+#include "Config.h"
 #include <signal.h>
 
 static int exit_flag = 0;
@@ -24,26 +25,23 @@ enum
 /* DATABASE COMMANDS */
 enum
 {
-		INIT_TABLES,
 		DB_READLINE,
 		DB_WRITELINE
 };
 
 const char* db_commands_names[] =
 {
-			"INIT_TABLES",
 			"DB_READLINE",
 			"DB_WRITELINE",
 			NULL
 };
 
 static int db_session_do_read(Server* serv_ptr, Session* sess);
-static void db_session_message_handler(Server* serv_ptr, Session* sess, const char* client_line);
 static void db_session_check_lf(Server* serv_ptr, Session* sess);
-
-static void db_server_close_session(Server* serv_ptr, int sock);
-static int db_server_accept_client(Server* serv_ptr);
+static void db_session_message_handler(Server* serv_ptr, Session* sess, const char* client_line);
 static Session* db_get_session_by_fd(Server* serv_ptr, int fd);
+static int db_server_accept_client(Server* serv_ptr);
+static void db_server_close_session(Server* serv_ptr, int sock);
 
 
 void stop_handler(int signo)
@@ -198,58 +196,8 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 	}
 	int tokens_num = i;
 
-	if ( strcmp(mes_tokens[0], db_commands_names[INIT_TABLES]) == 0 )
-	{
-		char records_num_buf[100];
-		int len = strlen(mes_tokens[1]);
 
-		if ( len >= 100 )
-			len = 99;
-
-		memcpy(records_num_buf, mes_tokens[1], len);
-		records_num_buf[len] = '\0';
-		int records_num = atoi(records_num_buf);
-
-
-		char usersinfo_name[100];
-		len = strlen(mes_tokens[2]);
-
-		if ( len >= 100 )
-			len = 99;
-
-		memcpy(usersinfo_name, mes_tokens[2], len);
-		usersinfo_name[len] = '\0';
-
-
-		char usersessions_name[100];
-		len = strlen(mes_tokens[3]);
-
-		if ( len >= 100 )
-			len = 99;
-
-		memcpy(usersessions_name, mes_tokens[3], len);
-		usersessions_name[len] = '\0';
-
-
-		int ret_value1 = db_create_userinfo_table(records_num, usersinfo_name);
-		int ret_value2 = db_create_usersessions_table(records_num, usersessions_name);
-
-		const char* msg_to_send = NULL;
-		if ( ret_value1 && ret_value2 )
-		{
-			msg_to_send = "DB_INITIALIZATION_SUCCESS\n";
-			memcpy(serv_ptr->userinfo_table_name, usersinfo_name, strlen(usersinfo_name)+1);
-			memcpy(serv_ptr->usersessions_table_name, usersessions_name, strlen(usersessions_name)+1);
-			serv_ptr->db_records_num = records_num;
-		}
-		else
-			msg_to_send = "DB_INITIALIZATION_ERROR\n";
-
-		len = strlen(msg_to_send);
-		int wc = write(sess->data->fd, msg_to_send, len);
-		printf("[%s] %s Sent %d\\%d bytes to %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, sess->data->addr);
-	}
-	else if ( strcmp(mes_tokens[0], db_commands_names[DB_READLINE]) == 0 )
+	if ( strcmp(mes_tokens[0], db_commands_names[DB_READLINE]) == 0 )
 	{
 		char search_key[100];
 		int len = strlen(mes_tokens[1]);
@@ -489,9 +437,10 @@ static Session* db_get_session_by_fd(Server* serv_ptr, int fd)
 	return NULL;
 }
 
-int db_server_init(int port)
+int db_server_init(int port, InitDbServData* server_data)
 {
 	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(struct sockaddr_in));
 	char cur_time[CURRENT_TIME_SIZE];
 
 
@@ -502,9 +451,9 @@ int db_server_init(int port)
 		fprintf(stderr, "[%s] %s socket() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
 		return -1;
 	}
-	int opt = 1;
-	setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)); /* Предотвращение "залипания" TCP порта */
 
+	int opt = 1;
+	setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));	/* Предотвращение "залипания" TCP порта */
 
 	printf("[%s] %s Binding socket to local address..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	addr.sin_family = AF_INET;
@@ -517,7 +466,6 @@ int db_server_init(int port)
 		return -1;
 	}
 
-
 	printf("[%s] %s Listening..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	if ( listen(listen_sock, QUEUE_SOCK_LEN) < 0 )
 	{
@@ -525,9 +473,44 @@ int db_server_init(int port)
 		return -1;
 	}
 
+	ConfigFields cfg_values;
+	memset(&cfg_values, 0, sizeof(ConfigFields));
+
+	if ( !read_configuration_file(&cfg_values) )
+	{
+		return -1;
+	}
+
+	FILE* cfg_fd = NULL;
+	if ( (cfg_fd = fopen(CONFIG_NAME, "r+")) == NULL )
+	{
+		fprintf(stderr, "[%s] %s Unable to open file \"%s\"\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
+		return -1;
+	}
+
+	FILE* usr_fd = NULL;
+	if ( !(usr_fd = db_create_userinfo_table(cfg_values.records_num, cfg_values.userinfo_filename)) )
+	{
+		return -1;
+	}
+
+	FILE* sess_fd = NULL;
+	if ( !(sess_fd = db_create_usersessions_table(cfg_values.records_num, cfg_values.usersessions_filename)) )
+	{
+		return -1;
+	}
+
+	server_data->ls = listen_sock;
+	server_data->cfg_fd = cfg_fd;
+	server_data->user_table_fd = usr_fd;
+	server_data->sess_table_fd = sess_fd;
+	server_data->db_records_num = cfg_values.records_num;
+	strcpy(server_data->user_table_name, cfg_values.userinfo_filename);
+	strcpy(server_data->sess_table_name, cfg_values.usersessions_filename);
+
 	printf("[%s] %s Waiting for connections..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 
-	return listen_sock;
+	return 1;
 }
 
 static int db_server_accept_client(Server* serv_ptr)
