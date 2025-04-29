@@ -194,7 +194,7 @@ FILE* db_create_userinfo_table(int records_num, const char* table_name)
 			return NULL;
 		}
 
-		if ( read_size == records_num )
+		if ( read_size >= records_num )
 		{
 			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" table \"%s\" is already initialized!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
 			return fd;
@@ -206,11 +206,8 @@ FILE* db_create_userinfo_table(int records_num, const char* table_name)
 			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 			return 0;
 		}
-
-		if ( read_size > 0 )
-			if ( records_num > read_size )
-				records_num -= read_size;
-
+		
+		records_num -= read_size;
 	}
 
 	DBUsersInformation* new_record = malloc( sizeof(DBUsersInformation) );
@@ -475,9 +472,7 @@ int db_get_record_index(FILE* fd, const char* search_key)
 		is_number = 1;
 	}
 
-	fseek(fd, 0, SEEK_SET);
-
-	for (i = 0; i < records_size; i++)
+	for ( i = 0; i < records_size; i++ )
 	{
 		memset(record, 0, sizeof(DBUsersInformation));
 		fseek(fd, i * sizeof(DBUsersInformation), SEEK_SET);

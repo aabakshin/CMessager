@@ -24,8 +24,7 @@ int main(int argc, char** argv)
 	InitDbServData srv_data;
 	memset(&srv_data, 0, sizeof(InitDbServData));
 
-	int listen_sock = -1;
-	if ( (listen_sock = db_server_init(port_number, &srv_data)) == -1 )
+	if ( db_server_init(port_number, &srv_data) == -1 )
 	{
 		fprintf(stderr, "[%s] %s Unable to initialize server\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 3;
