@@ -206,7 +206,7 @@ FILE* db_create_userinfo_table(int records_num, const char* table_name)
 			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 			return 0;
 		}
-		
+
 		records_num -= read_size;
 	}
 

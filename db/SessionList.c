@@ -133,12 +133,12 @@ int sess_clear(Session** list_ptr, int clear)
 	int i;
 	for ( i = 1; i <= size; i++ )
 	{
-		const ClientData* list = NULL;
-		if ( (list = sess_remove(list_ptr, (*list_ptr)->data)) != NULL )
+		const ClientData* data = NULL;
+		if ( (data = sess_remove(list_ptr, (*list_ptr)->data)) != NULL )
 		{
 			if ( clear )
-				if ( list )
-					free((void*)list);
+				if ( data )
+					free((void*)data);
 
 			removed++;
 		}

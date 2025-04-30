@@ -1,76 +1,87 @@
 #ifndef SERVERCORE_C_SENTRY
 #define SERVERCORE_C_SENTRY
 
-#include "DatabaseStructures.h"
-#include "DateTime.h"
-#include "StringList.h"
-#include "Commons.h"
 #include "serverCore.h"
+#include "DateTime.h"
+#include "Commons.h"
 #include "serverCommands.h"
-#include "serverConfigs.h"
 #include <signal.h>
 
 
-static ClientSession* make_new_session(int sockfd, struct sockaddr_in *from);
-static void session_handler_has_account(ClientSession* sess, const char* client_line);
-static void session_handler_login_wait_login(ClientSession* sess, const char* client_line);
-static void send_message_authorized(ClientSession* sess, const char* str);
-static void success_new_authorized(ClientSession* sess);
-static void session_handler_login_wait_pass(ClientSession* sess, const char* client_line);
-static void session_handler_signup_wait_login(ClientSession* sess, const char* client_line);
-static void session_handler_signup_wait_pass(ClientSession* sess, const char* client_line);
-static void session_handler_wait_message(ClientSession* sess, const char* client_line);
-static void session_fsm_step(ClientSession* sess, char* client_line);
-static void session_check_lf(ClientSession* sess);
-static int session_do_read(ClientSession* sess);
-static int send_config_data_to_db(const ConfigFields* cfg);
-static int server_accept_client(void);
+static int session_do_read(Server* serv_ptr, ClientSession* sess);
+static void session_check_lf(Server* serv_ptr, ClientSession* sess);
+static void session_fsm_step(Server* serv_ptr, ClientSession* sess, char* client_line);
+
+static void session_handler_has_account(Server* serv_ptr, ClientSession* sess, const char* client_line);
+static void session_handler_login_wait_login(Server* serv_ptr, ClientSession* sess, const char* client_line);
+static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* sess, const char* client_line);
+static void session_handler_signup_wait_login(Server* serv_ptr, ClientSession* sess, const char* client_line);
+static void session_handler_signup_wait_pass(Server* serv_ptr, ClientSession* sess, const char* client_line);
+static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, const char* client_line);
+
+static ClientSession* make_new_session(int sockfd, struct sockaddr_in* from);
+static void send_message_authorized(Server* serv_ptr, ClientSession* sess, const char* str);
+static void success_new_authorized(Server* serv_ptr, ClientSession* sess);
+static int server_accept_client(Server* serv_ptr);
 
 
-StringList* clients_online = NULL;
-Server* serv = NULL;
+Server* server_ptr = NULL;
 
 static int exit_flag = 0;
 static int sig_number = 0;
 
-enum 
-{				TIMER_VALUE			=			10,
-				TOKENS_NUM			=			16
+enum
+{				TIMEOUT 							=			 3,
+				TOKENS_NUM							=			16,
+				DEFAULT_MAX_SESSIONS_COUNT			=			10
 };
 
-
-void alrm_handler(int signo)
-{
-	char cur_time[CURRENT_TIME_SIZE];
-	int save_errno = errno;
-	signal(SIGALRM, alrm_handler);
-
-	alarm(0);
-
-	if ( serv )
-	{	
-		if ( serv->sess_array )
-			free(serv->sess_array);
-		free(serv);
-
-		sl_clear(&clients_online);
-	}
-
-	fprintf(stderr, "[%s] %s Unable to connect to database server. Connection timeout!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-	exit(1);
-
-	errno = save_errno;
-}
 
 void stop_handler(int signo)
 {
 	int save_errno = errno;
 	signal(SIGINT, stop_handler);
-	
+
 	sig_number = signo;
 	exit_flag = 1;
 
 	errno = save_errno;
+}
+
+void server_force_stop(Server* serv_ptr)
+{
+	char cur_time[CURRENT_TIME_SIZE];
+
+	printf("[%s] %s Stopping server...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+
+	close(serv_ptr->db_sock);
+
+	if ( serv_ptr )
+	{
+		if ( serv_ptr->sess_array )
+		{
+			for ( int i = 0; i < serv_ptr->sess_array_size; i++)
+			{
+				if ( serv_ptr->sess_array[i] )
+				{
+					close(serv_ptr->sess_array[i]->sockfd);
+					free(serv_ptr->sess_array[i]);
+					serv_ptr->sess_array[i] = NULL;
+				}
+			}
+			free(serv_ptr->sess_array);
+		}
+		sl_clear(&serv_ptr->clients_online);
+		close(serv_ptr->ls);
+		free(serv_ptr);
+	}
+	else
+	{
+		fprintf(stderr, "[%s] %s An error has occured while force stopping server!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+	}
+
+	printf("\n[%s] %s Closing socket..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	exit(1);
 }
 
 int is_valid_auth_str(const char* user_auth_str, int authentication)
@@ -84,7 +95,7 @@ int is_valid_auth_str(const char* user_auth_str, int authentication)
 	}
 
 	char* valid_symbols = ( !authentication ) ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_" : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_!?$#" ;
-	
+
 	int auth_str_len = strlen(user_auth_str);
 
 	if ( !authentication )
@@ -97,7 +108,7 @@ int is_valid_auth_str(const char* user_auth_str, int authentication)
 		if ( (auth_str_len < MIN_PASS_LENGTH) || (auth_str_len > MAX_PASS_LENGTH) )
 			return 0;
 	}
-	
+
 	if ( strcmp(user_auth_str, "undefined") == 0 )
 		return 0;
 
@@ -135,12 +146,7 @@ void session_send_string(ClientSession *sess, const char *str)
 
 	int mes_size = strlen(str)+1;
 	int bytes_sent = write(sess->sockfd, str, mes_size);
-	
-
-	if ( serv->sess_array[sess->sockfd] )
-		printf("[%s] %s Sent %d bytes to %s\n", get_time_str(current_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, bytes_sent, serv->sess_array[sess->sockfd]->last_ip);
-	else
-		printf("[%s] %s Sent %d bytes to %d socket\n", get_time_str(current_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, bytes_sent, sess->sockfd);
+	printf("[%s] %s Sent %d bytes to %s\n", get_time_str(current_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, bytes_sent, sess->last_ip);
 
 	view_data(str, bytes_sent, 'c', 50);
 	view_data(str, bytes_sent, 'd', 50);
@@ -187,7 +193,7 @@ static ClientSession* make_new_session(int sockfd, struct sockaddr_in* from)
 	return sess;
 }
 
-static void session_handler_has_account(ClientSession* sess, const char* client_line)
+static void session_handler_has_account(Server* serv_ptr, ClientSession* sess, const char* client_line)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -209,13 +215,13 @@ static void session_handler_has_account(ClientSession* sess, const char* client_
 	}
 }
 
-int read_query_from_db(char* read_buf, const char* search_key)
+int read_query_from_db(Server* serv_ptr, char* read_buf, const char* search_key)
 {
 	char cur_time[CURRENT_TIME_SIZE];
-	
-	if ( search_key == NULL )
+
+	if ( (search_key == NULL) || (*search_key == '\0') )
 	{
-		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" \"client_line\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" \"search_key\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
 
@@ -227,29 +233,56 @@ int read_query_from_db(char* read_buf, const char* search_key)
 	response_to_db[len] = '\n';
 	response_to_db[len+1] = '\0';
 
-	if ( serv->db_sock < 0 )
+	if ( serv_ptr->db_sock < 0 )
 	{
 		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" database socket is less than 0!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
 
-	int wc = write(serv->db_sock, response_to_db, len+1);
-	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len+1, SERVER_DB_ADDR, SERVER_DB_PORT);
-		
-	//////////////////////////////////////////////////////////////////////////////////
-	alarm(TIMER_VALUE);
-	
-	int rc = read(serv->db_sock, read_buf, sizeof(read_buf));
-	
-	alarm( 0 );
-	//////////////////////////////////////////////////////////////////////////////////
+	int wc = write(serv_ptr->db_sock, response_to_db, len+1);
+	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len+1, SERVER_DATABASE_ADDR, SERVER_DATABASE_PORT);
 
+
+	/* гарантируем, что следующий вызов read не заблокирует процесс */
+	fd_set readfds;
+	FD_ZERO(&readfds);
+	FD_SET(serv_ptr->db_sock, &readfds);
+	int max_d = serv_ptr->db_sock;
+
+	struct timeval tm;
+	tm.tv_sec = TIMEOUT;
+	tm.tv_usec = 0;
+
+	int res = select(max_d + 1, &readfds, NULL, NULL, &tm);
+	if ( res < 1 )
+	{
+		if ( res == -1 )
+		{
+			if ( errno == EINTR )
+			{
+				if ( sig_number == SIGINT )
+					if ( exit_flag )
+						server_force_stop(serv_ptr);
+				fprintf(stderr, "[%s] %s In function \"read_query_from_db\" received strange signal (#%d)\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sig_number);
+				return 0;
+			}
+
+			fprintf(stderr, "[%s] %s In function \"read_query_from_db\" select() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
+			return 0;
+		}
+
+		fprintf(stderr, "[%s] %s Database server didn't answer too long!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
+
+	int rc = read(serv_ptr->db_sock, read_buf, sizeof(read_buf));
 	if ( rc < 1 )
 	{
 		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
-	
+
 	if ( rc < BUFFER_SIZE )
 	{
 		if ( read_buf[rc-1] == '\n' )
@@ -259,17 +292,17 @@ int read_query_from_db(char* read_buf, const char* search_key)
 	{
 		read_buf[BUFFER_SIZE-1] = '\0';
 	}
-	
+
 	if ( strcmp("DB_LINE_NOT_FOUND", read_buf) == 0 )
 	{
-		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" unable to find record with key \"%s\" in database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, search_key);		
-		return -1;
+		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" unable to find record with key \"%s\" in database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, search_key);
+		return 0;
 	}
-	
+
 	return 1;
 }
 
-int write_query_into_db(const char** strings_to_query)
+int write_query_into_db(Server* serv_ptr, const char** strings_to_query)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -281,7 +314,7 @@ int write_query_into_db(const char** strings_to_query)
 
 	char response_to_db[BUFFER_SIZE];
 	memset(response_to_db, 0, sizeof(response_to_db));
-	
+
 	int i = 1;
 	int len = strlen(strings_to_query[0]);
 	strcpy(response_to_db, strings_to_query[0]);
@@ -296,30 +329,57 @@ int write_query_into_db(const char** strings_to_query)
 	}
 	response_to_db[len-1] = '\n';
 
-	if ( serv->db_sock < 0 )
+	if ( serv_ptr->db_sock < 0 )
 	{
 		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" database socket is less than 0!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
 
-	int wc = write(serv->db_sock, response_to_db, len);
-	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, SERVER_DB_ADDR, SERVER_DB_PORT);
-		
-	//////////////////////////////////////////////////////////////////////////////////
-	alarm(TIMER_VALUE);
-	
-	char read_buf[BUFFER_SIZE];
-	int rc = read(serv->db_sock, read_buf, sizeof(read_buf));
-	
-	alarm( 0 );
-	//////////////////////////////////////////////////////////////////////////////////
+	int wc = write(serv_ptr->db_sock, response_to_db, len);
+	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, SERVER_DATABASE_ADDR, SERVER_DATABASE_PORT);
 
+
+	/* гарантируем, что следующий вызов read не заблокирует процесс */
+	fd_set readfds;
+	FD_ZERO(&readfds);
+	FD_SET(serv_ptr->db_sock, &readfds);
+	int max_d = serv_ptr->db_sock;
+
+	struct timeval tm;
+	tm.tv_sec = TIMEOUT;
+	tm.tv_usec = 0;
+
+	int res = select(max_d + 1, &readfds, NULL, NULL, &tm);
+	if ( res < 1 )
+	{
+		if ( res == -1 )
+		{
+			if ( errno == EINTR )
+			{
+				if ( sig_number == SIGINT )
+					if ( exit_flag )
+						server_force_stop(serv_ptr);
+				fprintf(stderr, "[%s] %s In function \"read_query_from_db\" received strange signal (#%d)\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sig_number);
+				return 0;
+			}
+
+			fprintf(stderr, "[%s] %s In function \"read_query_from_db\" select() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
+			return 0;
+		}
+
+		fprintf(stderr, "[%s] %s Database server didn't answer too long!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
+
+	char read_buf[BUFFER_SIZE];
+	int rc = read(serv_ptr->db_sock, read_buf, sizeof(read_buf));
 	if ( rc < 1 )
 	{
 		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
-	
+
 	if ( rc < BUFFER_SIZE )
 	{
 		if ( read_buf[rc-1] == '\n' )
@@ -329,17 +389,17 @@ int write_query_into_db(const char** strings_to_query)
 	{
 		read_buf[BUFFER_SIZE-1] = '\0';
 	}
-	
+
 	if ( strcmp("DB_LINE_WRITE_SUCCESS", read_buf) != 0 )
 	{
-		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);		
+		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
 
 	return 1;
 }
 
-int get_field_from_db(char* field, const char* search_key, int field_code)
+int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int field_code)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -348,7 +408,7 @@ int get_field_from_db(char* field, const char* search_key, int field_code)
 		fprintf(stderr, "[%s] %s In function \"get_field_from_db\" \"client_line\" or \"user_pass\" is NULL!", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
-	
+
 	if ( (field_code < ID) || (field_code > REGISTRATION_DATE) )
 	{
 		fprintf(stderr, "[%s] %s In function \"get_field_from_db\" \"field_code\" has incorrect value!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
@@ -356,13 +416,9 @@ int get_field_from_db(char* field, const char* search_key, int field_code)
 	}
 
 	char read_buf[BUFFER_SIZE];
-	int rqfd_res = read_query_from_db(read_buf, search_key);
-	if ( rqfd_res != 1 )
+	int rqfd_res = read_query_from_db(serv_ptr, read_buf, search_key);
+	if ( !rqfd_res )
 	{
-		if ( rqfd_res == 0 )
-		{
-			return 0;
-		}
 		return 0;
 	}
 
@@ -378,16 +434,14 @@ int get_field_from_db(char* field, const char* search_key, int field_code)
 
 		istr = strtok(NULL, "|");
 	}
-	
+
 	strcpy(field, parsed_options[field_code]);
 
 	return 1;
 }
 
-static void session_handler_login_wait_login(ClientSession* sess, const char* client_line)
+static void session_handler_login_wait_login(Server* serv_ptr, ClientSession* sess, const char* client_line)
 {
-	signal(SIGALRM, alrm_handler);
-
 	char cur_time[CURRENT_TIME_SIZE];
 
 	if ( (sess == NULL) || (client_line == NULL) || (strcmp(client_line, "undefined") == 0) )
@@ -397,8 +451,8 @@ static void session_handler_login_wait_login(ClientSession* sess, const char* cl
 						"\"client_line\" is \"undefined\"\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return;
 	}
-	
-	StringList* list = clients_online;
+
+	StringList* list = serv_ptr->clients_online;
 	while ( list )
 	{
 		if ( strcmp(client_line, list->data) == 0 )
@@ -408,9 +462,9 @@ static void session_handler_login_wait_login(ClientSession* sess, const char* cl
 		}
 		list = list->next;
 	}
-	
+
 	char id_param[100];
-	if ( !get_field_from_db(id_param, client_line, ID) )
+	if ( !get_field_from_db(serv_ptr, id_param, client_line, ID) )
 	{
 		return;
 	}
@@ -420,14 +474,14 @@ static void session_handler_login_wait_login(ClientSession* sess, const char* cl
 	{
 		memcpy(sess->login, client_line, strlen(client_line)+1);
 		session_send_string(sess, "*LOGIN_WAIT_PASS\n");
-	 	sess->state = fsm_login_process_wait_pass;
+		sess->state = fsm_login_process_wait_pass;
 		return;
 	}
-	
+
 	session_send_string(sess, "*LOGIN_NOT_EXIST\n");
 }
 
-static void send_message_authorized(ClientSession* sess, const char* str)
+static void send_message_authorized(Server* serv_ptr, ClientSession* sess, const char* str)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -442,20 +496,20 @@ static void send_message_authorized(ClientSession* sess, const char* str)
 	int len = strlen(str);
 	int pos = len;
 	memcpy(message, str, len+1);
-	
+
 	len = strlen(sess->login);
 	pos += len;
 	strncat(message, sess->login, len);
 	message[pos] = '\n';
 	pos++;
 	message[pos] = '\0';
-	
+
 	int i;
-	for ( i = 0; i < serv->sess_array_size; i++ )
+	for ( i = 0; i < serv_ptr->sess_array_size; i++ )
 	{
-		if ( ( serv->sess_array[i] ) )
+		if ( ( serv_ptr->sess_array[i] ) )
 		{
-			if ( (i == sess->sockfd) || (!serv->sess_array[i]->authorized) )
+			if ( (i == sess->sockfd) || (!serv_ptr->sess_array[i]->authorized) )
 				continue;
 
 			write(i, message, strlen(message)+1);
@@ -463,7 +517,7 @@ static void send_message_authorized(ClientSession* sess, const char* str)
 	}
 }
 
-static void success_new_authorized(ClientSession* sess)
+static void success_new_authorized(Server* serv_ptr, ClientSession* sess)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -475,24 +529,24 @@ static void success_new_authorized(ClientSession* sess)
 
 	char str[BUFSIZE];
 	const char* code = "*SUCCESSFULLY_AUTHORIZED|";
-	
+
 	int len = strlen(code);
 	int pos = len;
 	memcpy(str, code, len+1);
-	
+
 	len = strlen(sess->login);
 	pos += len;
 	strncat(str, sess->login, len);
 	str[pos] = '\n';
 	pos++;
 	str[pos] = '\0';
-	
+
 	session_send_string(sess, str);
-	
-	send_message_authorized(sess, "*USER_AUTHORIZED|");
+
+	send_message_authorized(serv_ptr, sess, "*USER_AUTHORIZED|");
 }
 
-static void session_handler_login_wait_pass(ClientSession* sess, const char* client_line)
+static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* sess, const char* client_line)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -502,7 +556,7 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 		return;
 	}
 
-	StringList* list = clients_online;
+	StringList* list = serv_ptr->clients_online;
 	while ( list )
 	{
 		if ( strcmp(sess->login, list->data) == 0 )
@@ -513,9 +567,9 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 		}
 		list = list->next;
 	}
-	
+
 	char id_param[ID_SIZE];
-	if ( !get_field_from_db(id_param, sess->login, ID) )
+	if ( !get_field_from_db(serv_ptr, id_param, sess->login, ID) )
 	{
 		return;
 	}
@@ -528,9 +582,9 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 		sess->state = fsm_error;
 		return;
 	}
-	
+
 	char pass[PASS_SIZE];
-	if ( !get_field_from_db(pass, sess->login, PASS) )
+	if ( !get_field_from_db(serv_ptr, pass, sess->login, PASS) )
 	{
 		return;
 	}
@@ -542,12 +596,12 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 		memcpy(sess->pass, client_line, strlen(client_line)+1);
 
 		get_date_str(sess->last_date_in, CURRENT_DATE_BUF_SIZE);
-		
-		if ( !get_field_from_db(sess->registration_date, sess->login, REGISTRATION_DATE) )
+
+		if ( !get_field_from_db(serv_ptr, sess->registration_date, sess->login, REGISTRATION_DATE) )
 		{
 			return;
 		}
-		
+
 		char rank[RANK_SIZE];
 		set_user_rank(sess);
 		rank[0] = get_user_rank(sess->rank);
@@ -555,32 +609,32 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 
 		if ( sess->muted )
 			eval_mute_time_left(sess);
-		
+
 		char smt[START_MUTE_TIME_SIZE];
-		if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
+		if ( !get_field_from_db(serv_ptr, smt, sess->login, START_MUTE_TIME) )
 		{
 			return;
 		}
 		sess->start_mute_time = atoi(smt);
 
 		char mt[MUTE_TIME_SIZE];
-		if ( !get_field_from_db(smt, sess->login, MUTE_TIME) )
+		if ( !get_field_from_db(serv_ptr, smt, sess->login, MUTE_TIME) )
 		{
 			return;
 		}
 		sess->mute_time = atoi(mt);
 
 		char muted[MUTED_SIZE];
-		if ( !get_field_from_db(smt, sess->login, MUTED) )
+		if ( !get_field_from_db(serv_ptr, smt, sess->login, MUTED) )
 		{
 			return;
 		}
 		sess->muted = atoi(muted);
-		
+
 		char mtl[MUTE_TIME_LEFT_SIZE];
 		itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
-		const char* query_strings[] = 
+		const char* query_strings[] =
 		{
 						"DB_WRITELINE|",
 						sess->login,
@@ -599,28 +653,28 @@ static void session_handler_login_wait_pass(ClientSession* sess, const char* cli
 						"undefined",
 						NULL
 		};
-		
-		if ( !write_query_into_db(query_strings) )
+
+		if ( !write_query_into_db(serv_ptr, query_strings) )
 		{
 			return;
 		}
-		
+
 		sess->authorized = 1;
 
 		sess->user_status = status_online;
-		sl_insert(&clients_online, sess->login);
+		sl_insert(&serv_ptr->clients_online, sess->login);
 
 		sess->state = fsm_wait_message;
-		
-		success_new_authorized(sess);
+
+		success_new_authorized(serv_ptr, sess);
 
 		return;
 	}
-	
+
 	session_send_string(sess, "*PASS_NOT_MATCH\n");
 }
 
-static void session_handler_signup_wait_login(ClientSession* sess, const char* client_line)
+static void session_handler_signup_wait_login(Server* serv_ptr, ClientSession* sess, const char* client_line)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -633,7 +687,7 @@ static void session_handler_signup_wait_login(ClientSession* sess, const char* c
 	if ( is_valid_auth_str(client_line, 0) )
 	{
 		char id_param[ID_SIZE];
-		if ( !get_field_from_db(id_param, client_line, ID) )
+		if ( !get_field_from_db(serv_ptr, id_param, client_line, ID) )
 		{
 			return;
 		}
@@ -644,7 +698,7 @@ static void session_handler_signup_wait_login(ClientSession* sess, const char* c
 			session_send_string(sess, "*LOGIN_ALREADY_USED\n");
 			return;
 		}
-		
+
 		memcpy(sess->login, client_line, strlen(client_line)+1);
 		session_send_string(sess, "*SIGNUP_WAIT_PASS\n");
 		sess->state = fsm_signup_wait_pass;
@@ -654,7 +708,7 @@ static void session_handler_signup_wait_login(ClientSession* sess, const char* c
 	session_send_string(sess, "*LOGIN_INCORRECT\n");
 }
 
-static void session_handler_signup_wait_pass(ClientSession* sess, const char* client_line)
+static void session_handler_signup_wait_pass(Server* serv_ptr, ClientSession* sess, const char* client_line)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -665,9 +719,9 @@ static void session_handler_signup_wait_pass(ClientSession* sess, const char* cl
 	}
 
 	if ( is_valid_auth_str(client_line, 1) )
-	{	
+	{
 		memcpy(sess->pass, client_line, strlen(client_line)+1);
-	
+
 		get_date_str(sess->last_date_in, CURRENT_DATE_BUF_SIZE);
 		get_date_str(sess->registration_date, CURRENT_DATE_BUF_SIZE);
 
@@ -680,20 +734,20 @@ static void session_handler_signup_wait_pass(ClientSession* sess, const char* cl
 		sess->start_mute_time = 0;
 		sess->mute_time = 0;
 		sess->mute_time_left = 0;
-		
+
 		char muted[MUTED_SIZE];
 		itoa(sess->muted, muted, MUTED_SIZE-1);
-	
+
 		char smt[START_MUTE_TIME_SIZE];
 		itoa(sess->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
-	
+
 		char mt[MUTE_TIME_SIZE];
 		itoa(sess->mute_time, mt, MUTE_TIME_SIZE-1);
 
 		char mtl[MUTE_TIME_LEFT_SIZE];
 		itoa(sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
-		const char* query_strings[] = 
+		const char* query_strings[] =
 		{
 						"DB_WRITELINE|",
 						sess->login,
@@ -712,8 +766,8 @@ static void session_handler_signup_wait_pass(ClientSession* sess, const char* cl
 						sess->registration_date,
 						NULL
 		};
-		
-		if ( !write_query_into_db(query_strings) )
+
+		if ( !write_query_into_db(serv_ptr, query_strings) )
 		{
 			return;
 		}
@@ -721,11 +775,11 @@ static void session_handler_signup_wait_pass(ClientSession* sess, const char* cl
 		sess->authorized = 1;
 
 		sess->user_status = status_online;
-		sl_insert(&clients_online, sess->login);
-		
+		sl_insert(&serv_ptr->clients_online, sess->login);
+
 		sess->state = fsm_wait_message;
 
-		success_new_authorized(sess);
+		success_new_authorized(serv_ptr, sess);
 
 		return;
 	}
@@ -733,7 +787,7 @@ static void session_handler_signup_wait_pass(ClientSession* sess, const char* cl
 	session_send_string(sess, "*NEW_PASS_INCORRECT\n");
 }
 
-static void session_handler_wait_message(ClientSession* sess, const char* client_line)
+static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, const char* client_line)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -767,7 +821,7 @@ static void session_handler_wait_message(ClientSession* sess, const char* client
 			{
 				const char* victim_message = "*MUTE_COMMAND_YOU_MUTED|";
 				char response_victim[100];
-				
+
 				int len = strlen(victim_message);
 				int pos = len;
 				memcpy(response_victim, victim_message, len+1);
@@ -827,7 +881,7 @@ static void session_handler_wait_message(ClientSession* sess, const char* client
 			{
 				const char* victim_message = "*MUTE_COMMAND_YOU_MUTED|";
 				char response_victim[100];
-				
+
 				int len = strlen(victim_message);
 				int pos = len;
 				memcpy(response_victim, victim_message, len+1);
@@ -935,7 +989,7 @@ static void session_handler_wait_message(ClientSession* sess, const char* client
 	}
 }
 
-static void session_fsm_step(ClientSession* sess, char* client_line)
+static void session_fsm_step(Server* serv_ptr, ClientSession* sess, char* client_line)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -948,27 +1002,27 @@ static void session_fsm_step(ClientSession* sess, char* client_line)
 	switch ( sess->state )
 	{
 		case fsm_client_has_account:
-			session_handler_has_account(sess, client_line);
+			session_handler_has_account(serv_ptr, sess, client_line);
 			free(client_line);
 			break;
 		case fsm_login_process_wait_login:
-			session_handler_login_wait_login(sess, client_line);
+			session_handler_login_wait_login(serv_ptr, sess, client_line);
 			free(client_line);
 			break;
 		case fsm_login_process_wait_pass:
-			session_handler_login_wait_pass(sess, client_line);
+			session_handler_login_wait_pass(serv_ptr, sess, client_line);
 			free(client_line);
 			break;
 		case fsm_signup_wait_login:
-			session_handler_signup_wait_login(sess, client_line);
+			session_handler_signup_wait_login(serv_ptr, sess, client_line);
 			free(client_line);
 			break;
 		case fsm_signup_wait_pass:
-			session_handler_signup_wait_pass(sess, client_line);
+			session_handler_signup_wait_pass(serv_ptr, sess, client_line);
 			free(client_line);
 			break;
 		case fsm_wait_message:
-			session_handler_wait_message(sess, client_line);
+			session_handler_wait_message(serv_ptr, sess, client_line);
 			free(client_line);
 			break;
 		case fsm_finish:
@@ -977,7 +1031,7 @@ static void session_fsm_step(ClientSession* sess, char* client_line)
 	}
 }
 
-static void session_check_lf(ClientSession* sess)
+static void session_check_lf(Server* serv_ptr, ClientSession* sess)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -1006,20 +1060,20 @@ static void session_check_lf(ClientSession* sess)
 
 	memcpy(client_line, sess->buf, pos);
 	client_line[pos] = '\0';
-	
+
 	sess->buf_used -= (pos+1);
 	memmove(sess->buf, sess->buf+pos+1, sess->buf_used);
 	if ( client_line[pos-1] == '\r' )
 		client_line[pos-1] = '\0';
 
 	printf("( %s )\n", client_line);
-	session_fsm_step(sess, client_line);
+	session_fsm_step(serv_ptr, sess, client_line);
 }
 
-static int session_do_read(ClientSession* sess)
+static int session_do_read(Server* serv_ptr, ClientSession* sess)
 {
 	char cur_time[CURRENT_TIME_SIZE];
-	
+
 	if ( sess == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"session_handler_wait_message\" params \"sess\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
@@ -1029,7 +1083,7 @@ static int session_do_read(ClientSession* sess)
 
 	int rc = read(sess->sockfd, sess->buf, BUFSIZE);
 	printf("[%s] %s Received %d bytes from %s => ", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, rc, sess->last_ip);
-	
+
 	if ( rc < 1 )
 	{
 		if ( rc == 0 )
@@ -1047,16 +1101,16 @@ static int session_do_read(ClientSession* sess)
 	}
 
 	sess->buf_used += rc;
-	
+
 	if ( sess->buf_used >= BUFSIZE )
 	{
 		fprintf(stderr, "[%s] %s Client's(%s) line is too long!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sess->login);
 		sess->state = fsm_error;
-		
+
 		return 0;
 	}
 
-	session_check_lf(sess);
+	session_check_lf(serv_ptr, sess);
 
 	if ( sess->state == fsm_finish )
 		return 0;
@@ -1064,69 +1118,50 @@ static int session_do_read(ClientSession* sess)
 	return 1;
 }
 
-static int send_config_data_to_db(const ConfigFields* cfg)
+int server_init(int port, Server* serv_ptr)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
-	char send_buf[BUFFER_SIZE];
-	const char* init_db_msg = "INIT_TABLES|";
-	int pos = strlen(init_db_msg);
-	memcpy(send_buf, init_db_msg, pos);
 
-	strcat(send_buf, cfg->userinfo_filename);
-	pos += strlen(cfg->userinfo_filename);
-	send_buf[pos] = '|';
-	pos++;
-	send_buf[pos] = '\0';
+	printf("[%s] %s Trying to connect to database server..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	struct sockaddr_in db_addr;
+	db_addr.sin_family = AF_INET;
 
-	strcat(send_buf, cfg->usersessions_filename);
-	pos += strlen(cfg->usersessions_filename);
-	send_buf[pos] = '\n';
-	send_buf[pos+1] = '\0';
-	
-	int data_size = pos+1;
-	int wc = write(serv->db_sock, send_buf, data_size);
-	
-	//////////////////////////////////////////////////////////////////////////////////
-	alarm(TIMER_VALUE);
-	
-	char read_buf[BUFFER_SIZE];
-	int rc = read(serv->db_sock, read_buf, sizeof(read_buf));
-	
-	alarm( 0 );
-	//////////////////////////////////////////////////////////////////////////////////
-
-	if ( rc < 1 )
+	if ( !inet_aton(SERVER_DATABASE_ADDR, &db_addr.sin_addr) )
 	{
-		fprintf(stderr, "[%s] %s Database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s Incorrect server database address!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
-	
-	if ( rc < BUFFER_SIZE )
+
+	int db_port = atoi(SERVER_DATABASE_PORT);
+	if ( db_port <= 1024 )
 	{
-		if ( read_buf[rc-1] == '\n' )
-			read_buf[rc-1] = '\0';
-	}
-	else
-	{
-		read_buf[BUFFER_SIZE-1] = '\0';
-	}
-	
-	if ( strcmp("DB_INITIALIZATION_SUCCESS", read_buf) != 0 )
-	{
-		fprintf(stderr, "[%s] %s Database server unable to initialize himself.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);		
+		fprintf(stderr, "[%s] %s Incorrect port number!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 0;
 	}
-	
-	return 1;
-}
+	db_addr.sin_port = htons(db_port);
 
-int server_init(int port)
-{
-	signal(SIGALRM, alrm_handler);
+	int srv_db_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if ( srv_db_sock == -1 )
+	{
+		fprintf(stderr, "[%s] %s socket() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
+		return 0;
+	}
 
-	struct sockaddr_in addr;
-	char cur_time[CURRENT_TIME_SIZE];
+	/* Предотвращение "залипания" TCP порта */
+	int opt = 1;
+	setsockopt(srv_db_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+	if ( connect(srv_db_sock, (struct sockaddr*) &db_addr, sizeof(db_addr)) == -1 )
+	{
+		fprintf(stderr, "[%s] %s connect() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
+		return 0;
+	}
+	printf("[%s] %s Connected.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+
+	serv_ptr->db_sock = srv_db_sock;
+
+
 
 	printf("[%s] %s Creating socket..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	int listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -1137,11 +1172,12 @@ int server_init(int port)
 	}
 
 	/* Предотвращение "залипания" TCP порта */
-	int opt = 1;
+	opt = 1;
 	setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-	
-	
+
 	printf("[%s] %s Binding socket to local address..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -1152,191 +1188,75 @@ int server_init(int port)
 		return 0;
 	}
 
-
 	printf("[%s] %s Listening..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	if ( listen(listen_sock, QUEUE_SOCK_LEN) < 0 )
 	{
 		fprintf(stderr, "[%s] %s listen() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
 		return 0;
 	}
-	
 
-	printf("[%s] %s Trying to connect to local database server..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
-	struct sockaddr_in db_addr;
-	db_addr.sin_family = AF_INET;
+	serv_ptr->ls = listen_sock;
+	serv_ptr->clients_online = NULL;
 
-	int ok;
-	ok = inet_aton(SERVER_DB_ADDR, &db_addr.sin_addr);
-	if ( !ok )
-	{
-		fprintf(stderr, "[%s] %s Incorrect server database address!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-	
-	int db_port = atoi(SERVER_DB_PORT);
-	if ( db_port < 1024 )
-	{
-		fprintf(stderr, "[%s] %s Incorrect port number!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-	db_addr.sin_port = htons(db_port);
-	
-	int srv_db_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if ( srv_db_sock == -1 )
-	{
-		fprintf(stderr, "[%s] %s socket() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
-		return 0;
-	}
-	opt = 1;																											/* Предотвращение "залипания" TCP порта */
-	setsockopt(srv_db_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-	if ( connect(srv_db_sock, (struct sockaddr*) &db_addr, sizeof(db_addr)) == -1 )
-	{
-		fprintf(stderr, "[%s] %s connect() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
-		return 0;
-	}
-	printf("[%s] %s Connected.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 
-	ConfigFields cfg;
-	memset(&cfg, 0, sizeof(struct ConfigFields));
-
-	if ( !read_configuration_file(&cfg) )
-	{
-		fprintf(stderr, "[%s] %s Unable to read configuration file \"%s\"!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
-		return 0;
-	}
-
-	serv = malloc( sizeof(Server) );
-	if ( !serv )
-	{
-		fprintf(stderr, "[%s] %s memory error in \"serv\" struct!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-	serv->db_sock = srv_db_sock;
-	serv->ls = listen_sock;
-	serv->sess_array = malloc(cfg.records_num * sizeof(ClientSession*));
-	if ( !serv->sess_array )
+	serv_ptr->sess_array = malloc(DEFAULT_MAX_SESSIONS_COUNT * sizeof(ClientSession*));
+	if ( !serv_ptr->sess_array )
 	{
 		fprintf(stderr, "[%s] %s memory error in \"serv\" struct records!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-
-		if (serv)
-			free(serv);
-
-		return 0;
-	}	
-	serv->sess_array_size = cfg.records_num;
-	
-	int i;
-	for (i = 0; i < serv->sess_array_size; i++)
-		serv->sess_array[i] = NULL;
-
-
-	printf("[%s] %s Sending configuration data to database server...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
-	if ( !send_config_data_to_db(&cfg) )
-	{
-		if ( serv )
-		{
-			if ( serv->sess_array )
-				free(serv->sess_array);
-			free(serv);
-		}
-		
-		sl_clear(&clients_online);
-
 		return 0;
 	}
-	printf("[%s] %s Database server has successfully configured.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
-	
+	serv_ptr->sess_array_size = DEFAULT_MAX_SESSIONS_COUNT;
+
+	for ( int i = 0; i < serv_ptr->sess_array_size; i++ )
+		serv_ptr->sess_array[i] = NULL;
+
+
+
 	printf("[%s] %s Waiting for connections..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 
 	return 1;
 }
 
-static int server_accept_client(void)
+static int server_accept_client(Server* serv_ptr)
 {
-	struct sockaddr_in addr;
-	socklen_t len = sizeof(addr);
 	char cur_time[CURRENT_TIME_SIZE];
 
-	int client_sock = accept(serv->ls, (struct sockaddr*) &addr, &len);
+	struct sockaddr_in addr;
+	socklen_t len = sizeof(addr);
+	memset(&addr, 0, len);
+	int client_sock = accept(serv_ptr->ls, (struct sockaddr*) &addr, &len);
 	if ( client_sock == -1 )
 	{
 		fprintf(stderr, "[%s] %s accept() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
+		server_force_stop(serv_ptr);
 		return -1;
 	}
 
-	if ( client_sock >= serv->sess_array_size )
+	if ( client_sock >= serv_ptr->sess_array_size )
 	{
-		int newlen = serv->sess_array_size + serv->sess_array_size;
+		int newlen = serv_ptr->sess_array_size * 2;
 
-		serv->sess_array = realloc(serv->sess_array, newlen * sizeof(ClientSession*));
-		if ( !serv->sess_array )
+		serv_ptr->sess_array = realloc(serv_ptr->sess_array, newlen * sizeof(ClientSession*));
+		if ( !serv_ptr->sess_array )
 		{
-			fprintf(stderr, "[%s] %s memory error in \"serv\" struct records!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-
-			if ( serv )
-				free(serv);
-
-			sl_clear(&clients_online);
-
-			return -2;
+			fprintf(stderr, "[%s] %s memory error in \"serv_ptr\" struct records!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+			server_force_stop(serv_ptr);
+			return -1;
 		}
 
-		int i;
-		for ( i = serv->sess_array_size; i < newlen; i++ )
-			serv->sess_array[i] = NULL;
-		serv->sess_array_size = newlen;
-		
-		/* Записываем новый размер базы данных в конфиг-файл */
-		ConfigFields cfg;
-		cfg.records_num = newlen;
-		memset(cfg.userinfo_filename, 0, sizeof(cfg.userinfo_filename));
-		strcpy(cfg.userinfo_filename, CONFIG_SETTING_DEFAULT_USERSDATA_DB_NAME_VALUE);
-		memset(cfg.usersessions_filename, 0, sizeof(cfg.usersessions_filename));
-		strcpy(cfg.usersessions_filename, CONFIG_SETTING_DEFAULT_USERSSESSIONS_DB_NAME_VALUE);
-		
-		if ( !write_configuration_file(&cfg) )
-		{
-			if ( serv )
-			{
-				if ( serv->sess_array )
-					free(serv->sess_array);
-				free(serv);
-			}
-			
-			sl_clear(&clients_online);
-			
-			fprintf(stderr, "[%s] %s Unable to write data in configuration file \"%s\"\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
-
-			return -2;
-		}
-		printf("[%s] %s Configuration file \"%s\" has been updated!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, CONFIG_NAME);
-
-		if ( !send_config_data_to_db(&cfg) )
-		{
-			if ( serv )
-			{
-				if ( serv->sess_array )
-					free(serv->sess_array);
-				free(serv);
-			}
-			
-			sl_clear(&clients_online);
-
-			fprintf(stderr, "[%s] %s Unable to send config data to remote peer\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-
-			return -2;
-		}
-		printf("[%s] %s Database server records has successfully updated.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+		for ( int i = serv_ptr->sess_array_size; i < newlen; i++ )
+			serv_ptr->sess_array[i] = NULL;
+		serv_ptr->sess_array_size = newlen;
 	}
 
-	serv->sess_array[client_sock] = make_new_session(client_sock, &addr);
-	printf("[%s] %s New connection from %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, serv->sess_array[client_sock]->last_ip);
+	serv_ptr->sess_array[client_sock] = make_new_session(client_sock, &addr);
+	printf("[%s] %s New connection from %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, serv_ptr->sess_array[client_sock]->last_ip);
 
 	return client_sock;
 }
-void server_close_session(int sock_num)
+
+void server_close_session(int sock_num, Server* serv_ptr)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -1346,28 +1266,35 @@ void server_close_session(int sock_num)
 		return;
 	}
 
-	if ( serv->sess_array[sock_num]->muted )
-		eval_mute_time_left(serv->sess_array[sock_num]);
+	ClientSession* close_sess = serv_ptr->sess_array[sock_num];
+	if ( !close_sess )
+	{
+		fprintf(stderr, "[%s] %s In function \"server_close_session\" \"close_sess\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return;
+	}
+
+	if ( close_sess->muted )
+		eval_mute_time_left(close_sess);
 
 	char muted[MUTED_SIZE];
-	itoa(serv->sess_array[sock_num]->muted, muted, MUTED_SIZE-1);
+	itoa(close_sess->muted, muted, MUTED_SIZE-1);
 
 	char smt[START_MUTE_TIME_SIZE];
-	itoa(serv->sess_array[sock_num]->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
+	itoa(close_sess->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
 
 	char mt[MUTE_TIME_SIZE];
-	itoa(serv->sess_array[sock_num]->mute_time, mt, MUTE_TIME_SIZE-1);
+	itoa(close_sess->mute_time, mt, MUTE_TIME_SIZE-1);
 
 	char mtl[MUTE_TIME_LEFT_SIZE];
-	itoa(serv->sess_array[sock_num]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
-	
+	itoa(close_sess->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+
 	char last_date_out[CURRENT_DATE_BUF_SIZE];
 	get_date_str(last_date_out, CURRENT_DATE_BUF_SIZE);
 
-	const char* query_strings[] = 
+	const char* query_strings[] =
 	{
 					"DB_WRITELINE|",
-					serv->sess_array[sock_num]->login,
+					close_sess->login,
 					"undefined",
 					"undefined",
 					"undefined",
@@ -1383,43 +1310,46 @@ void server_close_session(int sock_num)
 					"undefined",
 					NULL
 	};
-	
-	if ( !write_query_into_db(query_strings) )
+
+	if ( !write_query_into_db(serv_ptr, query_strings) )
 	{
 		return;
 	}
 
-	if ( clients_online )
-		sl_remove(&clients_online, serv->sess_array[sock_num]->login);
-	
-	if ( serv->sess_array[sock_num]->authorized )
-		send_message_authorized(serv->sess_array[sock_num], "*USER_LEFT_CHAT|");
+	if ( serv_ptr->clients_online )
+		sl_remove(&serv_ptr->clients_online, close_sess->login);
+
+	if ( close_sess->authorized )
+		send_message_authorized(serv_ptr, close_sess, "*USER_LEFT_CHAT|");
 
 	close(sock_num);
-	printf("[%s] %s Lost connection from %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, serv->sess_array[sock_num]->last_ip);
+	printf("[%s] %s Lost connection from %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, close_sess->last_ip);
 
-	free(serv->sess_array[sock_num]);
-	serv->sess_array[sock_num] = NULL;
+	free(close_sess);
+	close_sess = NULL;
 }
 
-int server_running(void)
+int server_running(Server* serv_ptr)
 {
-	signal(SIGINT, stop_handler);
+	server_ptr = serv_ptr;
 
-	fd_set readfds;
-	int res, max_d;
 	char cur_time[CURRENT_TIME_SIZE];
+
+	signal(SIGINT, stop_handler);
 
 	while ( 1 )
 	{
+		fd_set readfds;
+		int res, max_d;
+
 		FD_ZERO(&readfds);
-		FD_SET(serv->ls, &readfds);
-		max_d = serv->ls;
+		FD_SET(serv_ptr->ls, &readfds);
+		max_d = serv_ptr->ls;
 
 		int i;
-		for ( i = 0; i < serv->sess_array_size; i++ )
+		for ( i = 0; i < serv_ptr->sess_array_size; i++ )
 		{
-			if ( serv->sess_array[i] )
+			if ( serv_ptr->sess_array[i] )
 			{
 				FD_SET(i, &readfds);
 				if ( i > max_d )
@@ -1433,20 +1363,8 @@ int server_running(void)
 			if ( errno == EINTR )
 			{
 				if ( sig_number == SIGINT )
-				{
-					for ( i = 0; i < serv->sess_array_size; i++ )
-						if ( serv->sess_array[i] )
-							server_close_session(i);
-					
-					if ( serv->sess_array )
-						free(serv->sess_array);
-					free(serv);
-
-					sl_clear(&clients_online);
-
 					if ( exit_flag )
-						break;
-				}
+						server_force_stop(serv_ptr);
 
 				fprintf(stderr, "[%s] %s Got some signal (#%d)\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, errno);
 			}
@@ -1457,14 +1375,13 @@ int server_running(void)
 			continue;
 		}
 
-		if ( FD_ISSET(serv->ls, &readfds) )
-			if ( server_accept_client() == -2 )
-				break;
+		if ( FD_ISSET(serv_ptr->ls, &readfds) )
+			server_accept_client(serv_ptr);
 
-		for ( i = 0; i < serv->sess_array_size; i++ )
-			if ( serv->sess_array[i] && FD_ISSET(i, &readfds) )
-				if ( !session_do_read(serv->sess_array[i]) )
-					server_close_session(i);
+		for ( i = 0; i < serv_ptr->sess_array_size; i++ )
+			if ( serv_ptr->sess_array[i] && FD_ISSET(i, &readfds) )
+				if ( !session_do_read(serv_ptr, serv_ptr->sess_array[i]) )
+					server_close_session(i, serv_ptr);
 	}
 
 	printf("\n[%s] %s Closing socket..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);

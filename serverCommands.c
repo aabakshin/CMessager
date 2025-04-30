@@ -46,8 +46,7 @@ static void draw_line(int line_length, int c);
 static void send_mute_response(ClientSession* sess, const char* username);
 
 
-extern StringList* clients_online;
-extern Server* serv;
+extern Server* server_ptr;
 extern const char* server_codes_list[SERVER_CODES_COUNT];
 
 
@@ -226,16 +225,16 @@ void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	int pos = len;
 	memcpy(send_buf, whoih, len+1);
 
-	StringList* clients_list = clients_online;
+	StringList* clients_list = server_ptr->clients_online;
 	while ( clients_list )
 	{
 		int i;
-		for ( i = 0; i < serv->sess_array_size; i++ )
-			if ( serv->sess_array[i] )
-				if ( strcmp(clients_list->data, serv->sess_array[i]->login) == 0 )
+		for ( i = 0; i < server_ptr->sess_array_size; i++ )
+			if ( server_ptr->sess_array[i] )
+				if ( strcmp(clients_list->data, server_ptr->sess_array[i]->login) == 0 )
 					break;
 
-		if ( (serv->sess_array[i]->user_status != status_invisible) || (sess->rank == ADMIN_RANK_VALUE) )
+		if ( (server_ptr->sess_array[i]->user_status != status_invisible) || (sess->rank == ADMIN_RANK_VALUE) )
 		{
 			len = strlen(clients_list->data);
 			pos += len;
@@ -331,7 +330,7 @@ void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 						NULL
 		};
 
-		if ( !write_query_into_db(query_strings) )
+		if ( !write_query_into_db(server_ptr, query_strings) )
 		{
 			return;
 		}
@@ -449,7 +448,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 
 	char id_param[ID_SIZE];
-	if ( !get_field_from_db(id_param, buffer_username, ID) )
+	if ( !get_field_from_db(server_ptr, id_param, buffer_username, ID) )
 	{
 		return;
 	}
@@ -462,7 +461,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	}
 
 	int is_online = 0;
-	StringList* cl_onl = clients_online;
+	StringList* cl_onl = server_ptr->clients_online;
 	while ( cl_onl != NULL )
 	{
 		if ( strcmp(cl_onl->data, buffer_username) == 0 )
@@ -476,50 +475,50 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	if ( is_online )
 	{
 		int i;
-		for ( i = 0; i < serv->sess_array_size; i++ )
-			if ( serv->sess_array[i] )
-				if ( strcmp(serv->sess_array[i]->login, buffer_username) == 0 )
+		for ( i = 0; i < server_ptr->sess_array_size; i++ )
+			if ( server_ptr->sess_array[i] )
+				if ( strcmp(server_ptr->sess_array[i]->login, buffer_username) == 0 )
 					break;
 
-		if ( serv->sess_array[i]->rank != ADMIN_RANK_VALUE )
+		if ( server_ptr->sess_array[i]->rank != ADMIN_RANK_VALUE )
 		{
-			serv->sess_array[i]->rank = ADMIN_RANK_VALUE;
+			server_ptr->sess_array[i]->rank = ADMIN_RANK_VALUE;
 
 			char rank[RANK_SIZE];
-			rank[0] = get_user_rank(serv->sess_array[i]->rank);
+			rank[0] = get_user_rank(server_ptr->sess_array[i]->rank);
 			rank[1] = '\0';
 
-			if ( serv->sess_array[i]->muted )
-				eval_mute_time_left(serv->sess_array[i]);
+			if ( server_ptr->sess_array[i]->muted )
+				eval_mute_time_left(server_ptr->sess_array[i]);
 
 			char smt[START_MUTE_TIME_SIZE];
-			if ( !get_field_from_db(smt, serv->sess_array[i]->login, START_MUTE_TIME) )
+			if ( !get_field_from_db(server_ptr, smt, server_ptr->sess_array[i]->login, START_MUTE_TIME) )
 			{
 				return;
 			}
-			serv->sess_array[i]->start_mute_time = atoi(smt);
+			server_ptr->sess_array[i]->start_mute_time = atoi(smt);
 
 			char mt[MUTE_TIME_SIZE];
-			if ( !get_field_from_db(mt, serv->sess_array[i]->login, MUTE_TIME) )
+			if ( !get_field_from_db(server_ptr, mt, server_ptr->sess_array[i]->login, MUTE_TIME) )
 			{
 				return;
 			}
-			serv->sess_array[i]->mute_time = atoi(mt);
+			server_ptr->sess_array[i]->mute_time = atoi(mt);
 
 			char muted[MUTED_SIZE];
-			if ( !get_field_from_db(muted, serv->sess_array[i]->login, MUTED) )
+			if ( !get_field_from_db(server_ptr, muted, server_ptr->sess_array[i]->login, MUTED) )
 			{
 				return;
 			}
-			serv->sess_array[i]->muted = atoi(muted);
+			server_ptr->sess_array[i]->muted = atoi(muted);
 
 			char mtl[MUTE_TIME_LEFT_SIZE];
-			itoa(serv->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+			itoa(server_ptr->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
 			const char* query_strings[] =
 			{
 							"DB_WRITELINE|",
-							serv->sess_array[i]->login,
+							server_ptr->sess_array[i]->login,
 							"undefined",
 							rank,
 							"undefined",
@@ -536,7 +535,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							NULL
 			};
 
-			if ( !write_query_into_db(query_strings) )
+			if ( !write_query_into_db(server_ptr, query_strings) )
 			{
 				return;
 			}
@@ -550,7 +549,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	else
 	{
 		char rank[RANK_SIZE];
-		if ( !get_field_from_db(rank, buffer_username, RANK) )
+		if ( !get_field_from_db(server_ptr, rank, buffer_username, RANK) )
 		{
 			return;
 		}
@@ -578,7 +577,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							NULL
 			};
 
-			if ( !write_query_into_db(query_strings) )
+			if ( !write_query_into_db(server_ptr, query_strings) )
 			{
 				return;
 			}
@@ -769,10 +768,10 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	if ( dbops )
 		fclose(dbops);
 	/* удаляем пользователя из списка админов в файле ops.txt и перезаписываем этот файл */
-
+	
 
 	char id_param[ID_SIZE];
-	if ( !get_field_from_db(id_param, buffer_username, ID) )
+	if ( !get_field_from_db(server_ptr, id_param, buffer_username, ID) )
 	{
 		return;
 	}
@@ -785,7 +784,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	}
 
 	int is_online = 0;
-	StringList* cl_onl = clients_online;
+	StringList* cl_onl = server_ptr->clients_online;
 	while ( cl_onl != NULL )
 	{
 		if ( strcmp(cl_onl->data, buffer_username) == 0 )
@@ -799,55 +798,55 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	if ( is_online )
 	{
 		int i;
-		for ( i = 0; i < serv->sess_array_size; i++ )
-			if ( serv->sess_array[i] )
-				if ( strcmp(serv->sess_array[i]->login, buffer_username) == 0 )
+		for ( i = 0; i < server_ptr->sess_array_size; i++ )
+			if ( server_ptr->sess_array[i] )
+				if ( strcmp(server_ptr->sess_array[i]->login, buffer_username) == 0 )
 					break;
 
-		if ( serv->sess_array[i]->rank != ADMIN_RANK_VALUE )
+		if ( server_ptr->sess_array[i]->rank != ADMIN_RANK_VALUE )
 		{
 			session_send_string(sess, "*DEOP_COMMAND_USER_ALREADY_USER\n");
 			return;
 		}
 		else
 		{
-			set_user_rank(serv->sess_array[i]);
+			set_user_rank(server_ptr->sess_array[i]);
 
 			char rank[RANK_SIZE];
-			rank[0] = get_user_rank(serv->sess_array[i]->rank);
+			rank[0] = get_user_rank(server_ptr->sess_array[i]->rank);
 			rank[1] = '\0';
 
-			if ( serv->sess_array[i]->muted )
-				eval_mute_time_left(serv->sess_array[i]);
+			if ( server_ptr->sess_array[i]->muted )
+				eval_mute_time_left(server_ptr->sess_array[i]);
 
 			char smt[START_MUTE_TIME_SIZE];
-			if ( !get_field_from_db(smt, serv->sess_array[i]->login, START_MUTE_TIME) )
+			if ( !get_field_from_db(server_ptr, smt, server_ptr->sess_array[i]->login, START_MUTE_TIME) )
 			{
 				return;
 			}
-			serv->sess_array[i]->start_mute_time = atoi(smt);
+			server_ptr->sess_array[i]->start_mute_time = atoi(smt);
 
 			char mt[MUTE_TIME_SIZE];
-			if ( !get_field_from_db(mt, serv->sess_array[i]->login, MUTE_TIME) )
+			if ( !get_field_from_db(server_ptr, mt, server_ptr->sess_array[i]->login, MUTE_TIME) )
 			{
 				return;
 			}
-			serv->sess_array[i]->mute_time = atoi(mt);
+			server_ptr->sess_array[i]->mute_time = atoi(mt);
 
 			char muted[MUTED_SIZE];
-			if ( !get_field_from_db(muted, serv->sess_array[i]->login, MUTED) )
+			if ( !get_field_from_db(server_ptr, muted, server_ptr->sess_array[i]->login, MUTED) )
 			{
 				return;
 			}
-			serv->sess_array[i]->muted = atoi(muted);
+			server_ptr->sess_array[i]->muted = atoi(muted);
 
 			char mtl[MUTE_TIME_LEFT_SIZE];
-			itoa(serv->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+			itoa(server_ptr->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
 			const char* query_strings[] =
 			{
 							"DB_WRITELINE|",
-							serv->sess_array[i]->login,
+							server_ptr->sess_array[i]->login,
 							"undefined",
 							rank,
 							"undefined",
@@ -864,7 +863,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							NULL
 			};
 
-			if ( !write_query_into_db(query_strings) )
+			if ( !write_query_into_db(server_ptr, query_strings) )
 			{
 				return;
 			}
@@ -873,7 +872,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	else
 	{
 		char rank[RANK_SIZE];
-		if ( !get_field_from_db(rank, buffer_username, RANK) )
+		if ( !get_field_from_db(server_ptr, rank, buffer_username, RANK) )
 		{
 			return;
 		}
@@ -886,13 +885,13 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		else
 		{
 			char ldi[LAST_DATE_IN_SIZE];
-			if ( !get_field_from_db(ldi, buffer_username, LAST_DATE_IN) )
+			if ( !get_field_from_db(server_ptr, ldi, buffer_username, LAST_DATE_IN) )
 			{
 				return;
 			}
 
 			char rd[REG_DATE_SIZE];
-			if ( !get_field_from_db(rd, buffer_username, REGISTRATION_DATE) )
+			if ( !get_field_from_db(server_ptr, rd, buffer_username, REGISTRATION_DATE) )
 			{
 				return;
 			}
@@ -920,7 +919,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							NULL
 			};
 
-			if ( !write_query_into_db(query_strings) )
+			if ( !write_query_into_db(server_ptr, query_strings) )
 			{
 				return;
 			}
@@ -969,7 +968,7 @@ void pm_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		return;
 	}
 
-	StringList* list = clients_online;
+	StringList* list = server_ptr->clients_online;
 	while ( list )
 	{
 		if ( strcmp(list->data, buffer_username) == 0 )
@@ -1155,7 +1154,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 
 	/* Проверка, существует ли запись с таким именем в таблице БД */
 	char response[BUFFER_SIZE];
-	if ( read_query_from_db(response, registered_username) == -1 )
+	if ( read_query_from_db(server_ptr, response, registered_username) == -1 )
 	{
 		if ( response_struct )
 			free(response_struct);
@@ -1168,7 +1167,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 
 	/* извлечение поля RANK из таблицы */
 	char rank[RANK_SIZE];
-	if ( !get_field_from_db(rank, registered_username, RANK) )
+	if ( !get_field_from_db(server_ptr, rank, registered_username, RANK) )
 	{
 		if ( response_struct )
 			free(response_struct);
@@ -1201,7 +1200,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 
 
 	/* извлечение поля AGE из таблицы */
-	if ( !get_field_from_db(response_struct->age, registered_username, AGE) )
+	if ( !get_field_from_db(server_ptr, response_struct->age, registered_username, AGE) )
 	{
 		if ( response_struct )
 			free(response_struct);
@@ -1214,7 +1213,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 
 
 	/* извлечение поля REALNAME из таблицы */
-	if ( !get_field_from_db(response_struct->realname, registered_username, REALNAME) )
+	if ( !get_field_from_db(server_ptr, response_struct->realname, registered_username, REALNAME) )
 	{
 		if ( response_struct )
 			free(response_struct);
@@ -1226,7 +1225,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 
 
 	/* извлечение поля QUOTE из таблицы */
-	if ( !get_field_from_db(response_struct->quote, registered_username, QUOTE) )
+	if ( !get_field_from_db(server_ptr, response_struct->quote, registered_username, QUOTE) )
 	{
 		if ( response_struct )
 			free(response_struct);
@@ -1240,17 +1239,17 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 
 	/* вычисление значения STATUS заданного клиента */
 	int i;
-	for ( i = 0; i < serv->sess_array_size; i++ )
-		if ( serv->sess_array[i] )
-			if ( serv->sess_array[i]->authorized )
-				if ( (strcmp(registered_username, serv->sess_array[i]->login) == 0) )
+	for ( i = 0; i < server_ptr->sess_array_size; i++ )
+		if ( server_ptr->sess_array[i] )
+			if ( server_ptr->sess_array[i]->authorized )
+				if ( (strcmp(registered_username, server_ptr->sess_array[i]->login) == 0) )
 				{
-					const char* status = get_status_str(serv->sess_array[i]->user_status);
+					const char* status = get_status_str(server_ptr->sess_array[i]->user_status);
 					strcpy(response_struct->status, status);
 					break;
 				}
 
-	if ( i == serv->sess_array_size )
+	if ( i == server_ptr->sess_array_size )
 	{
 		const char* offline = "offline";
 		strcpy(response_struct->status, offline);
@@ -1259,7 +1258,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 
 	/* извлечение поля REGISTRATION_DATE из таблицы */
 	char registration_date[REG_DATE_SIZE];
-	if ( !get_field_from_db(registration_date, registered_username, REGISTRATION_DATE) )
+	if ( !get_field_from_db(server_ptr, registration_date, registered_username, REGISTRATION_DATE) )
 	{
 		if ( response_struct )
 			free(response_struct);
@@ -1316,7 +1315,7 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 
 
 	char response[BUFFER_SIZE];
-	if ( read_query_from_db(response, registered_username) == -1 )
+	if ( read_query_from_db(server_ptr, response, registered_username) == -1 )
 	{
 		if ( response_struct )
 			free(response_struct);
@@ -1328,7 +1327,7 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 
 
 	char rank[RANK_SIZE];
-	if ( !get_field_from_db(rank, registered_username, RANK) )
+	if ( !get_field_from_db(server_ptr, rank, registered_username, RANK) )
 	{
 		if ( response_struct )
 			free(response_struct);
@@ -1361,36 +1360,36 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 
 
 	int i;
-	for ( i = 0; i < serv->sess_array_size; i++ )
-		if ( serv->sess_array[i] )
-			if ( serv->sess_array[i]->authorized )
-				if ( (strcmp(registered_username, serv->sess_array[i]->login) == 0) )
+	for ( i = 0; i < server_ptr->sess_array_size; i++ )
+		if ( server_ptr->sess_array[i] )
+			if ( server_ptr->sess_array[i]->authorized )
+				if ( (strcmp(registered_username, server_ptr->sess_array[i]->login) == 0) )
 				{
-					const char* status = get_status_str(serv->sess_array[i]->user_status);
+					const char* status = get_status_str(server_ptr->sess_array[i]->user_status);
 					strcpy(response_struct->status, status);
 
-					itoa(serv->sess_array[i]->ID, response_struct->id, ID_SIZE-1);
-					itoa(serv->sess_array[i]->authorized, response_struct->auth, AUTH_STR_SIZE-1);
-					itoa(serv->sess_array[i]->buf_used, response_struct->used, USED_STR_SIZE-1);
+					itoa(server_ptr->sess_array[i]->ID, response_struct->id, ID_SIZE-1);
+					itoa(server_ptr->sess_array[i]->authorized, response_struct->auth, AUTH_STR_SIZE-1);
+					itoa(server_ptr->sess_array[i]->buf_used, response_struct->used, USED_STR_SIZE-1);
 
-					strcpy(response_struct->last_date_in, serv->sess_array[i]->last_date_in);
-					strcpy(response_struct->last_ip, serv->sess_array[i]->last_ip);
-					strcpy(response_struct->regdate, serv->sess_array[i]->registration_date);
-					strcpy(response_struct->pass, serv->sess_array[i]->pass);
+					strcpy(response_struct->last_date_in, server_ptr->sess_array[i]->last_date_in);
+					strcpy(response_struct->last_ip, server_ptr->sess_array[i]->last_ip);
+					strcpy(response_struct->regdate, server_ptr->sess_array[i]->registration_date);
+					strcpy(response_struct->pass, server_ptr->sess_array[i]->pass);
 
-					itoa(serv->sess_array[i]->sockfd, response_struct->sock, SOCK_STR_SIZE-1);
-					itoa(serv->sess_array[i]->state, response_struct->state, STATE_STR_SIZE-1);
+					itoa(server_ptr->sess_array[i]->sockfd, response_struct->sock, SOCK_STR_SIZE-1);
+					itoa(server_ptr->sess_array[i]->state, response_struct->state, STATE_STR_SIZE-1);
 
-					eval_mute_time_left(serv->sess_array[i]);
+					eval_mute_time_left(server_ptr->sess_array[i]);
 
-					itoa(serv->sess_array[i]->muted, response_struct->muted, MUTED_SIZE-1);
-					itoa(serv->sess_array[i]->mute_time, response_struct->mute_time, MUTE_TIME_SIZE-1);
-					itoa(serv->sess_array[i]->mute_time_left, response_struct->mute_time_left, MUTE_TIME_LEFT_SIZE-1);
-					itoa(serv->sess_array[i]->start_mute_time, response_struct->start_mute_time, START_MUTE_TIME_SIZE-1);
+					itoa(server_ptr->sess_array[i]->muted, response_struct->muted, MUTED_SIZE-1);
+					itoa(server_ptr->sess_array[i]->mute_time, response_struct->mute_time, MUTE_TIME_SIZE-1);
+					itoa(server_ptr->sess_array[i]->mute_time_left, response_struct->mute_time_left, MUTE_TIME_LEFT_SIZE-1);
+					itoa(server_ptr->sess_array[i]->start_mute_time, response_struct->start_mute_time, START_MUTE_TIME_SIZE-1);
 
 					char rank[RANK_SIZE];
-					set_user_rank(serv->sess_array[i]);
-					rank[0] = get_user_rank(serv->sess_array[i]->rank);
+					set_user_rank(server_ptr->sess_array[i]);
+					rank[0] = get_user_rank(server_ptr->sess_array[i]->rank);
 					rank[1] = '\0';
 
 					const char* query_strings[] =
@@ -1413,7 +1412,7 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 									NULL
 					};
 
-					if ( !write_query_into_db(query_strings) )
+					if ( !write_query_into_db(server_ptr, query_strings) )
 					{
 						return NULL;
 					}
@@ -1421,22 +1420,22 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 					break;
 				}
 
-	if ( i == serv->sess_array_size )
+	if ( i == server_ptr->sess_array_size )
 	{
 		const char* offline = "offline";
 		memcpy(response_struct->status, offline, strlen(offline)+1);
 
 		if (
-				!get_field_from_db(response_struct->id, registered_username, ID)							||
-				!get_field_from_db(response_struct->last_date_in, registered_username, LAST_DATE_IN)		||
-				!get_field_from_db(response_struct->last_ip, registered_username, LAST_IP)					||
-				!get_field_from_db(response_struct->regdate, registered_username, REGISTRATION_DATE)		||
-				!get_field_from_db(response_struct->pass, registered_username, PASS)						||
-				!get_field_from_db(response_struct->muted, registered_username, MUTED)						||
-				!get_field_from_db(response_struct->mute_time, registered_username, MUTE_TIME)				||
-				!get_field_from_db(response_struct->mute_time_left, registered_username, MUTE_TIME_LEFT)	||
-				!get_field_from_db(response_struct->start_mute_time, registered_username, START_MUTE_TIME)
-		   )
+				!get_field_from_db(server_ptr, response_struct->id, registered_username, ID)							||
+				!get_field_from_db(server_ptr, response_struct->last_date_in, registered_username, LAST_DATE_IN)		||
+				!get_field_from_db(server_ptr, response_struct->last_ip, registered_username, LAST_IP)					||
+				!get_field_from_db(server_ptr, response_struct->regdate, registered_username, REGISTRATION_DATE)		||
+				!get_field_from_db(server_ptr, response_struct->pass, registered_username, PASS)						||
+				!get_field_from_db(server_ptr, response_struct->muted, registered_username, MUTED)						||
+				!get_field_from_db(server_ptr, response_struct->mute_time, registered_username, MUTE_TIME)				||
+				!get_field_from_db(server_ptr, response_struct->mute_time_left, registered_username, MUTE_TIME_LEFT)	||
+				!get_field_from_db(server_ptr, response_struct->start_mute_time, registered_username, START_MUTE_TIME)
+		)
 		{
 			if ( response_struct )
 				free(response_struct);
@@ -1635,14 +1634,14 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	else if ( args_num == 2 )
 	{
 		char response[BUFFER_SIZE];
-		if ( read_query_from_db(response, buffer_param) == -1 )
+		if ( read_query_from_db(server_ptr, response, buffer_param) == -1 )
 		{
 			session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 			return;
 		}
 
 		char rank[RANK_SIZE];
-		if ( !get_field_from_db(rank, buffer_param, RANK))
+		if ( !get_field_from_db(server_ptr, rank, buffer_param, RANK))
 		{
 			return;
 		}
@@ -1675,7 +1674,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 			else
 			{
 				char response[BUFFER_SIZE];
-				if ( read_query_from_db(response, buffer_param_value) == -1 )
+				if ( read_query_from_db(server_ptr, response, buffer_param_value) == -1 )
 				{
 					session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 					return;
@@ -1725,21 +1724,21 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 					eval_mute_time_left(sess);
 
 				char smt[START_MUTE_TIME_SIZE];
-				if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
+				if ( !get_field_from_db(server_ptr, smt, sess->login, START_MUTE_TIME) )
 				{
 					return;
 				}
 				sess->start_mute_time = atoi(smt);
 
 				char mt[MUTE_TIME_SIZE];
-				if ( !get_field_from_db(mt, sess->login, MUTE_TIME) )
+				if ( !get_field_from_db(server_ptr, mt, sess->login, MUTE_TIME) )
 				{
 					return;
 				}
 				sess->mute_time = atoi(mt);
 
 				char muted[MUTED_SIZE];
-				if ( !get_field_from_db(muted, sess->login, MUTED) )
+				if ( !get_field_from_db(server_ptr, muted, sess->login, MUTED) )
 				{
 					return;
 				}
@@ -1768,7 +1767,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								NULL
 				};
 
-				if ( !write_query_into_db(query_strings) )
+				if ( !write_query_into_db(server_ptr, query_strings) )
 				{
 					return;
 				}
@@ -1797,21 +1796,21 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 					eval_mute_time_left(sess);
 
 				char smt[START_MUTE_TIME_SIZE];
-				if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
+				if ( !get_field_from_db(server_ptr, smt, sess->login, START_MUTE_TIME) )
 				{
 					return;
 				}
 				sess->start_mute_time = atoi(smt);
 
 				char mt[MUTE_TIME_SIZE];
-				if ( !get_field_from_db(mt, sess->login, MUTE_TIME) )
+				if ( !get_field_from_db(server_ptr, mt, sess->login, MUTE_TIME) )
 				{
 					return;
 				}
 				sess->mute_time = atoi(mt);
 
 				char muted[MUTED_SIZE];
-				if ( !get_field_from_db(muted, sess->login, MUTED) )
+				if ( !get_field_from_db(server_ptr, muted, sess->login, MUTED) )
 				{
 					return;
 				}
@@ -1840,7 +1839,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								NULL
 				};
 
-				if ( !write_query_into_db(query_strings) )
+				if ( !write_query_into_db(server_ptr, query_strings) )
 				{
 					return;
 				}
@@ -1887,21 +1886,21 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 					eval_mute_time_left(sess);
 
 				char smt[START_MUTE_TIME_SIZE];
-				if ( !get_field_from_db(smt, sess->login, START_MUTE_TIME) )
+				if ( !get_field_from_db(server_ptr, smt, sess->login, START_MUTE_TIME) )
 				{
 					return;
 				}
 				sess->start_mute_time = atoi(smt);
 
 				char mt[MUTE_TIME_SIZE];
-				if ( !get_field_from_db(mt, sess->login, MUTE_TIME) )
+				if ( !get_field_from_db(server_ptr, mt, sess->login, MUTE_TIME) )
 				{
 					return;
 				}
 				sess->mute_time = atoi(mt);
 
 				char muted[MUTED_SIZE];
-				if ( !get_field_from_db(muted, sess->login, MUTED) )
+				if ( !get_field_from_db(server_ptr, muted, sess->login, MUTED) )
 				{
 					return;
 				}
@@ -1930,7 +1929,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								NULL
 				};
 
-				if ( !write_query_into_db(query_strings) )
+				if ( !write_query_into_db(server_ptr, query_strings) )
 				{
 					return;
 				}
@@ -1958,15 +1957,15 @@ static void send_mute_response(ClientSession* sess, const char* username)
 	memcpy(response_to_victim, msg_to_victim, len+1);
 
 	int j;
-	for ( j = 0; j < serv->sess_array_size; j++ )
-		if ( serv->sess_array[j] )
-			if ( strcmp(serv->sess_array[j]->login, username) == 0 )
+	for ( j = 0; j < server_ptr->sess_array_size; j++ )
+		if ( server_ptr->sess_array[j] )
+			if ( strcmp(server_ptr->sess_array[j]->login, username) == 0 )
 				break;
 	int index = j;
 
 
 	char mt[MUTE_TIME_LEFT_SIZE];
-	itoa(serv->sess_array[index]->mute_time_left, mt, MUTE_TIME_LEFT_SIZE-1);
+	itoa(server_ptr->sess_array[index]->mute_time_left, mt, MUTE_TIME_LEFT_SIZE-1);
 
 	int mt_len = strlen(mt);
 	pos += mt_len;
@@ -1975,7 +1974,7 @@ static void send_mute_response(ClientSession* sess, const char* username)
 	pos++;
 	response_to_victim[pos] = '\0';
 
-	session_send_string(serv->sess_array[index], response_to_victim);
+	session_send_string(server_ptr->sess_array[index], response_to_victim);
 
 
 	const char* mute_success = "*MUTE_COMMAND_SUCCESS|";
@@ -2054,7 +2053,7 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	}
 
 
-	StringList* users_list = clients_online;
+	StringList* users_list = server_ptr->clients_online;
 	int is_online = 0;
 	while ( users_list )
 	{
@@ -2081,7 +2080,7 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	}
 
 	char muted[MUTED_SIZE];
-	if ( !get_field_from_db(muted, username_buf, MUTED) )
+	if ( !get_field_from_db(server_ptr, muted, username_buf, MUTED) )
 	{
 		return;
 	}
@@ -2101,33 +2100,33 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	}
 
 	int i;
-	for ( i = 0; i < serv->sess_array_size; i++)
+	for ( i = 0; i < server_ptr->sess_array_size; i++)
 	{
-		if ( serv->sess_array[i] )
+		if ( server_ptr->sess_array[i] )
 		{
-			if ( strcmp(serv->sess_array[i]->login, username_buf) == 0 )
+			if ( strcmp(server_ptr->sess_array[i]->login, username_buf) == 0 )
 			{
-				serv->sess_array[i]->muted = 1;
-				serv->sess_array[i]->mute_time = mute_time;
-				serv->sess_array[i]->mute_time_left = mute_time;
+				server_ptr->sess_array[i]->muted = 1;
+				server_ptr->sess_array[i]->mute_time = mute_time;
+				server_ptr->sess_array[i]->mute_time_left = mute_time;
 				time_t t = time(0);
-				serv->sess_array[i]->start_mute_time = t;
+				server_ptr->sess_array[i]->start_mute_time = t;
 
 				char rank[RANK_SIZE];
-				set_user_rank(serv->sess_array[i]);
-				rank[0] = get_user_rank(serv->sess_array[i]->rank);
+				set_user_rank(server_ptr->sess_array[i]);
+				rank[0] = get_user_rank(server_ptr->sess_array[i]->rank);
 				rank[1] = '\0';
 
-				itoa(serv->sess_array[i]->muted, muted, MUTED_SIZE-1);
+				itoa(server_ptr->sess_array[i]->muted, muted, MUTED_SIZE-1);
 
 				char smt[START_MUTE_TIME_SIZE];
-				itoa(serv->sess_array[i]->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
+				itoa(server_ptr->sess_array[i]->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
 
 				char mt[MUTE_TIME_SIZE];
-				itoa(serv->sess_array[i]->mute_time, mt, MUTE_TIME_SIZE-1);
+				itoa(server_ptr->sess_array[i]->mute_time, mt, MUTE_TIME_SIZE-1);
 
 				char mtl[MUTE_TIME_LEFT_SIZE];
-				itoa(serv->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+				itoa(server_ptr->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
 				const char* query_strings[] =
 				{
@@ -2149,7 +2148,7 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								NULL
 				};
 
-				if ( !write_query_into_db(query_strings) )
+				if ( !write_query_into_db(server_ptr, query_strings) )
 				{
 					return;
 				}
@@ -2199,7 +2198,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	}
 
 	char muted[MUTED_SIZE];
-	if ( !get_field_from_db(muted, username_buf, MUTED) )
+	if ( !get_field_from_db(server_ptr, muted, username_buf, MUTED) )
 	{
 		return;
 	}
@@ -2212,32 +2211,32 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	}
 
 	int i;
-	for ( i = 0; i < serv->sess_array_size; i++ )
+	for ( i = 0; i < server_ptr->sess_array_size; i++ )
 	{
-		if ( serv->sess_array[i] )
+		if ( server_ptr->sess_array[i] )
 		{
-			if ( strcmp(serv->sess_array[i]->login, username_buf) == 0 )
+			if ( strcmp(server_ptr->sess_array[i]->login, username_buf) == 0 )
 			{
-				serv->sess_array[i]->muted = 0;
-				serv->sess_array[i]->mute_time = 0;
-				serv->sess_array[i]->mute_time_left = 0;
-				serv->sess_array[i]->start_mute_time = 0;
+				server_ptr->sess_array[i]->muted = 0;
+				server_ptr->sess_array[i]->mute_time = 0;
+				server_ptr->sess_array[i]->mute_time_left = 0;
+				server_ptr->sess_array[i]->start_mute_time = 0;
 
 				char rank[RANK_SIZE];
-				set_user_rank(serv->sess_array[i]);
-				rank[0] = get_user_rank(serv->sess_array[i]->rank);
+				set_user_rank(server_ptr->sess_array[i]);
+				rank[0] = get_user_rank(server_ptr->sess_array[i]->rank);
 				rank[1] = '\0';
 
-				itoa(serv->sess_array[i]->muted, muted, MUTED_SIZE-1);
+				itoa(server_ptr->sess_array[i]->muted, muted, MUTED_SIZE-1);
 
 				char smt[START_MUTE_TIME_SIZE];
-				itoa(serv->sess_array[i]->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
+				itoa(server_ptr->sess_array[i]->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
 
 				char mt[MUTE_TIME_SIZE];
-				itoa(serv->sess_array[i]->mute_time, mt, MUTE_TIME_SIZE-1);
+				itoa(server_ptr->sess_array[i]->mute_time, mt, MUTE_TIME_SIZE-1);
 
 				char mtl[MUTE_TIME_LEFT_SIZE];
-				itoa(serv->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
+				itoa(server_ptr->sess_array[i]->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
 				const char* query_strings[] =
 				{
@@ -2259,12 +2258,12 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 								NULL
 				};
 
-				if ( !write_query_into_db(query_strings) )
+				if ( !write_query_into_db(server_ptr, query_strings) )
 				{
 					return;
 				}
 
-				session_send_string(serv->sess_array[i], "*UNMUTE_COMMAND_YOU_UNMUTED\n");
+				session_send_string(server_ptr->sess_array[i], "*UNMUTE_COMMAND_YOU_UNMUTED\n");
 				break;
 			}
 		}
@@ -2314,7 +2313,7 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		cmd_args = NULL;
 	}
 
-	StringList* users_list = clients_online;
+	StringList* users_list = server_ptr->clients_online;
 	int is_online = 0;
 	while ( users_list )
 	{
@@ -2341,15 +2340,15 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	}
 
 	int i;
-	for ( i = 0; i < serv->sess_array_size; i++ )
+	for ( i = 0; i < server_ptr->sess_array_size; i++ )
 	{
-		if ( serv->sess_array[i] )
+		if ( server_ptr->sess_array[i] )
 		{
-			if ( strcmp(serv->sess_array[i]->login, username_buf) == 0 )
+			if ( strcmp(server_ptr->sess_array[i]->login, username_buf) == 0 )
 			{
-				session_send_string(serv->sess_array[i], "*KICK_COMMAND_SUCCESS|VICTIM\n");
-				int sock = serv->sess_array[i]->sockfd;
-				server_close_session(sock);
+				session_send_string(server_ptr->sess_array[i], "*KICK_COMMAND_SUCCESS|VICTIM\n");
+				int sock = server_ptr->sess_array[i]->sockfd;
+				server_close_session(sock, server_ptr);
 			}
 		}
 	}
@@ -2465,7 +2464,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		itoa(i, key, 9);
 
 		char id[ID_SIZE];
-		if ( !get_field_from_db(id, key, ID) )
+		if ( !get_field_from_db(server_ptr, id, key, ID) )
 		{
 			continue;
 		}
@@ -2494,25 +2493,25 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 			itoa(i, key, 9);
 
 			char id[ID_SIZE];
-			if ( !get_field_from_db(id, key, ID) )
+			if ( !get_field_from_db(server_ptr, id, key, ID) )
 			{
 				continue;
 			}
 
 			char username[LOGIN_SIZE];
-			if ( !get_field_from_db(username, key, USERNAME) )
+			if ( !get_field_from_db(server_ptr, username, key, USERNAME) )
 			{
 				return;
 			}
 
 			char pass[PASS_SIZE];
-			if ( !get_field_from_db(pass, key, PASS) )
+			if ( !get_field_from_db(server_ptr, pass, key, PASS) )
 			{
 				return;
 			}
 
 			char rank[RANK_SIZE];
-			if ( !get_field_from_db(rank, key, RANK) )
+			if ( !get_field_from_db(server_ptr, rank, key, RANK) )
 			{
 				return;
 			}
@@ -2551,31 +2550,31 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 			itoa(i, key, 9);
 
 			char id[ID_SIZE];
-			if ( !get_field_from_db(id, key, ID) )
+			if ( !get_field_from_db(server_ptr, id, key, ID) )
 			{
 				continue;
 			}
 
 			char registration_date[REG_DATE_SIZE];
-			if ( !get_field_from_db(registration_date, key, REGISTRATION_DATE) )
+			if ( !get_field_from_db(server_ptr, registration_date, key, REGISTRATION_DATE) )
 			{
 				return;
 			}
 
 			char ldi[LAST_DATE_IN_SIZE];
-			if ( !get_field_from_db(ldi, key, LAST_DATE_IN) )
+			if ( !get_field_from_db(server_ptr, ldi, key, LAST_DATE_IN) )
 			{
 				return;
 			}
 
 			char ldo[LAST_DATE_IN_SIZE];
-			if ( !get_field_from_db(ldo, key, LAST_DATE_OUT) )
+			if ( !get_field_from_db(server_ptr, ldo, key, LAST_DATE_OUT) )
 			{
 				return;
 			}
 
 			char last_ip[LAST_IP_SIZE];
-			if ( !get_field_from_db(last_ip, key, LAST_IP) )
+			if ( !get_field_from_db(server_ptr, last_ip, key, LAST_IP) )
 			{
 				return;
 			}
@@ -2790,27 +2789,27 @@ void text_message_handler(ClientSession *sess, const char *msg, int is_private, 
 	free(buffer_str);
 
 	int mes_size = strlen(str)+1;
-	for ( i = 0; i < serv->sess_array_size; i++ )
+	for ( i = 0; i < server_ptr->sess_array_size; i++ )
 	{
-		if ( serv->sess_array[i] )
+		if ( server_ptr->sess_array[i] )
 		{
-			if ( (i == sess->sockfd) || (!serv->sess_array[i]->authorized) )
+			if ( (i == sess->sockfd) || (!server_ptr->sess_array[i]->authorized) )
 				continue;
 
 			if ( is_private )
 			{
-				if ( strcmp(serv->sess_array[i]->login, adresat) != 0 )
+				if ( strcmp(server_ptr->sess_array[i]->login, adresat) != 0 )
 					continue;
 
 				int bytes_sent = write(i, str, mes_size);
-				printf("[%s] %s Sent %d bytes to %s\n", get_time_str(cur_time, CUR_TIME_SIZE), INFO_MESSAGE_TYPE, bytes_sent, serv->sess_array[i]->last_ip);
+				printf("[%s] %s Sent %d bytes to %s\n", get_time_str(cur_time, CUR_TIME_SIZE), INFO_MESSAGE_TYPE, bytes_sent, server_ptr->sess_array[i]->last_ip);
 				view_data(str, bytes_sent, 'c', 50);
 				view_data(str, bytes_sent, 'd', 50);
 				break;
 			}
 
 			int bytes_sent = write(i, str, mes_size);
-			printf("[%s] %s Sent %d bytes to %s\n", get_time_str(cur_time, CUR_TIME_SIZE), INFO_MESSAGE_TYPE, bytes_sent, serv->sess_array[i]->last_ip);
+			printf("[%s] %s Sent %d bytes to %s\n", get_time_str(cur_time, CUR_TIME_SIZE), INFO_MESSAGE_TYPE, bytes_sent, server_ptr->sess_array[i]->last_ip);
 			view_data(str, bytes_sent, 'c', 50);
 			view_data(str, bytes_sent, 'd', 50);
 		}

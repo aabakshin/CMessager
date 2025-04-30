@@ -2,9 +2,10 @@
 #define SERVERAPI_H_SENTRY
 
 #include "DatabaseStructures.h"
+#include "StringList.h"
 
-#define SERVER_DB_ADDR			"192.168.50.128"
-#define SERVER_DB_PORT			"7778"
+#define SERVER_DATABASE_ADDR			"192.168.50.128"
+#define SERVER_DATABASE_PORT			"7778"
 
 
 /*A format of parsed table record from server database */
@@ -46,7 +47,7 @@ enum
 	SECRET_NUMBER				=			 900
 };
 
-enum status 
+enum status
 {
 	status_offline,
 	status_online,
@@ -77,7 +78,8 @@ typedef struct
 	int mute_time_left;
 } ClientSession;
 
-enum { 
+enum
+{
 		CMD_CODE_OVERLIMIT_LENGTH		=			-2,
 		CMD_CODE_UNKNOWN_COMMAND		=			-1,
 		CMD_CODE_TEXT_MESSAGE			=			 0,
@@ -113,16 +115,23 @@ typedef struct
 	int db_sock;
 	ClientSession** sess_array;
 	long long sess_array_size;
+	StringList* clients_online;
 } Server;
 
 
+/* Client interface */
+void session_send_string(ClientSession *sess, const char *str);
+
+/* Database interface */
+int read_query_from_db(Server* serv_ptr, char* read_buf, const char* search_key);
+int write_query_into_db(Server* serv_ptr, const char** strings_to_query);
+int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int field_code);
+
+/* Server interface */
 int is_valid_auth_str(const char *user_auth_str, int authentication);
-void session_send_string(ClientSession *sess, const char *str); 
-int read_query_from_db(char* read_buf, const char* search_key);
-int write_query_into_db(const char** strings_to_query);
-int get_field_from_db(char* field, const char* search_key, int field_code);
-int server_init(int port);
-void server_close_session(int sock_num);
-int server_running(void);                    
+int server_init(int port, Server* serv_ptr);
+void server_close_session(int sock_num, Server* serv_ptr);
+void server_force_stop(Server* serv_ptr);
+int server_running(Server* serv_ptr);
 
 #endif

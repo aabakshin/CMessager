@@ -43,6 +43,8 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 static Session* db_get_session_by_fd(Server* serv_ptr, int fd);
 static int db_server_accept_client(Server* serv_ptr);
 static void db_server_close_session(Server* serv_ptr, int sock);
+static void db_server_force_stop(Server* serv_ptr);
+
 
 
 void stop_handler(int signo)
@@ -56,6 +58,45 @@ void stop_handler(int signo)
 	errno = save_errno;
 }
 
+static void db_server_force_stop(Server* serv_ptr)
+{
+	char cur_time[CURRENT_TIME_SIZE];
+
+	if ( serv_ptr )
+	{
+		Session* sess = serv_ptr->sess_list;
+		while ( sess )
+		{
+			if ( (sess->data != NULL) && (sess->data->fd > -1) )
+				close(sess->data->fd);
+
+			sess = sess->next;
+		}
+
+		if ( sess_clear(&serv_ptr->sess_list, 1) )
+			serv_ptr->sess_list = NULL;
+
+		close(serv_ptr->server_data->ls);
+
+		if ( serv_ptr->server_data->cfg_fd )
+			fclose(serv_ptr->server_data->cfg_fd);
+
+		if ( serv_ptr->server_data->user_table_fd )
+			fclose(serv_ptr->server_data->user_table_fd);
+
+		if ( serv_ptr->server_data->sess_table_fd )
+			fclose(serv_ptr->server_data->sess_table_fd);
+
+		fprintf(stderr, "[%s] %s Unable to connect to remote host!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+	}
+	else
+	{
+		fprintf(stderr, "[%s] %s An error has occured while force stopping server!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+	}
+
+	printf("\n[%s] %s Closing socket..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	exit(1);
+}
 
 static int db_session_do_read(Server* serv_ptr, Session* sess)
 {
@@ -179,11 +220,6 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 	int len = strlen(client_line);
 	memcpy(buffer, client_line, (len < BUFFER_SIZE) ? len : BUFFER_SIZE-1);
 
-	/*if ( len < BUFFER_SIZE )
-		buffer[len] = '\0';
-	else
-		buffer[BUFFER_SIZE-1] = '\0';*/
-
 	int i = 0;
 	char* mes_tokens[MAX_TOKENS_IN_MESSAGE] = { NULL };
 	char* istr = strtok(buffer, "|");
@@ -261,7 +297,7 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 
 				FILE* usr_fd = db_create_userinfo_table(serv_ptr->server_data->db_records_num * 2, serv_ptr->server_data->user_table_name);
 				FILE* sess_fd = db_create_usersessions_table(serv_ptr->server_data->db_records_num * 2, serv_ptr->server_data->sess_table_name);
-				
+
 				if ( usr_fd && sess_fd )
 				{
 					serv_ptr->server_data->user_table_fd = usr_fd;
@@ -461,21 +497,21 @@ static int db_server_accept_client(Server* serv_ptr)
 	int ip =  ntohl(addr.sin_addr.s_addr);
 	int port = ntohs(addr.sin_port);
 
-	char* buf_ip = concat_addr_port(ip, port);
-	if ( !buf_ip )
+	char* str_ip = concat_addr_port(ip, port);
+	if ( !str_ip )
 	{
 		fprintf(stderr, "[%s] %s function \"concat_addr_port\" didn't make correct address!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
+	char buf_ip[100] = { 0 };
+	strcpy(buf_ip, str_ip);
+	free(str_ip);
+
 
 	ClientData* new_session = malloc(sizeof(ClientData));
 	if ( !new_session )
 	{
-		if ( buf_ip )
-			free(buf_ip);
-
 		fprintf(stderr, "[%s] %s In function \"db_server_accept_client\" unable to allocate memory to \"data\" pointer!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-
 		return -1;
 	}
 
@@ -486,9 +522,6 @@ static int db_server_accept_client(Server* serv_ptr)
 	sess_insert(&serv_ptr->sess_list, new_session);
 
 	printf("[%s] %s New connection from %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, buf_ip);
-
-	if ( buf_ip )
-		free(buf_ip);
 
 	return new_client_sock;
 }
@@ -565,22 +598,9 @@ int db_server_running(Server* serv_ptr)
 			if ( errno == EINTR )
 			{
 				if ( sig_number == SIGINT )
-				{
-					Session* sess = serv_ptr->sess_list;
-					while ( sess )
-					{
-						if ( (sess->data != NULL) && (sess->data->fd > -1) )
-							db_server_close_session(serv_ptr, sess->data->fd);
-
-						sess = sess->next;
-					}
-
-					if ( sess_clear(&serv_ptr->sess_list, 1) )
-						serv_ptr->sess_list = NULL;
-
 					if ( exit_flag )
-						break;
-				}
+						db_server_force_stop(serv_ptr);
+
 				fprintf(stderr, "[%s] %s Got some signal (#%d)\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, errno);
 			}
 			else

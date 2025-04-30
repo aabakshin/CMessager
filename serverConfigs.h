@@ -1,6 +1,7 @@
 #ifndef SERVERCONFIGS_H_SENTRY
 #define SERVERCONFIGS_H_SENTRY
 
+
 #define OPS_NAME											"ops.txt"
 
 
