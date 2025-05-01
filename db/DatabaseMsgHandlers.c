@@ -15,7 +15,56 @@ enum
 			WRITE_LINE_TOKENS				=			 15
 };
 
-int db_get_new_record_index(FILE* fd)
+int db_get_non_empty_records(FILE* usr_fd)
+{
+	char cur_time[MAX_TIME_STR_SIZE];
+
+	int records_num = db_userinfo_table_get_size(usr_fd);
+
+	if ( records_num > 0 )
+	{
+		DBUsersInformation* record = malloc(sizeof(DBUsersInformation));
+		if ( !record )
+		{
+			fprintf(stderr, "[%s] %s In function \"db_userinfo_table_is_empty\" unable to allocate memory to \"first_record\" pointer!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+			return 0;
+		}
+
+		int non_empty_records = 0;
+
+		fseek(usr_fd, 0, SEEK_END);
+		int file_size = ftell(usr_fd);
+		int total_read = 0;
+
+		fseek(usr_fd, 0, SEEK_SET);
+
+		while ( total_read < file_size )
+		{
+			int read_size = fread(record, sizeof(DBUsersInformation), 1, usr_fd);
+			if ( record->ID > -1 )
+				non_empty_records++;
+			else
+				break;
+
+			total_read += read_size;
+
+			if ( feof(usr_fd) )
+				break;
+		}
+
+		if ( record )
+			free(record);
+
+		fseek(usr_fd, 0, SEEK_SET);
+
+		return non_empty_records;
+	}
+
+	fprintf(stderr, "[%s] %s In function \"db_userinfo_table_is_empty\" \"records_num\" less than 1!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+	return 0;
+}
+
+int db_get_new_record_index(FILE* usr_fd)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
 
@@ -27,17 +76,25 @@ int db_get_new_record_index(FILE* fd)
 		return -1;
 	}
 
-	fseek(fd, 0, SEEK_SET);
+	fseek(usr_fd, 0, SEEK_END);
+	int file_size = ftell(usr_fd);
 
-	while ( !feof(fd) )
+	fseek(usr_fd, 0, SEEK_SET);
+
+	int total_read = 0;
+	while ( total_read < file_size )
 	{
-		fread(record, sizeof(DBUsersInformation), 1, fd);
+		int read_size = fread(record, sizeof(DBUsersInformation), 1, usr_fd);
 		if ( record->ID == -1 )
 		{
 			free(record);
-			fseek(fd, 0, SEEK_SET);
+			fseek(usr_fd, 0, SEEK_SET);
 			return index;
 		}
+		total_read += read_size;
+
+		if ( feof(usr_fd) )
+			break;
 
 		index++;
 	}
@@ -45,12 +102,12 @@ int db_get_new_record_index(FILE* fd)
 	if ( record )
 		free(record);
 
-	fseek(fd, 0, SEEK_SET);
+	fseek(usr_fd, 0, SEEK_SET);
 
 	return -1;
 }
 
-int db_userinfo_table_get_size(FILE* fd)
+int db_userinfo_table_get_size(FILE* usr_fd)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
 
@@ -63,27 +120,36 @@ int db_userinfo_table_get_size(FILE* fd)
 
 	int records_num = 0;
 
-	fseek(fd, 0, SEEK_SET);
+	fseek(usr_fd, 0, SEEK_END);
+	int file_size = ftell(usr_fd);
+	int total_read = 0;
 
-	while ( !feof(fd) )
+	fseek(usr_fd, 0, SEEK_SET);
+
+	while ( total_read < file_size )
 	{
-		fread(record, sizeof(DBUsersInformation), 1, fd);
+		int read_size = fread(record, sizeof(DBUsersInformation), 1, usr_fd);
+		total_read += read_size;
+
+		if ( feof(usr_fd) )
+			break;
+
 		records_num++;
 	}
 
 	if ( record )
 		free(record);
 
-	fseek(fd, 0, SEEK_SET);
+	fseek(usr_fd, 0, SEEK_SET);
 
 	return records_num;
 }
 
-int db_userinfo_table_is_empty(FILE* fd)
+int db_userinfo_table_is_empty(FILE* usr_fd)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
 
-	int records_num = db_userinfo_table_get_size(fd);
+	int records_num = db_userinfo_table_get_size(usr_fd);
 
 	if ( records_num > 0 )
 	{
@@ -96,22 +162,30 @@ int db_userinfo_table_is_empty(FILE* fd)
 
 		int non_empty_record = 0;
 
-		fseek(fd, 0, SEEK_SET);
+		fseek(usr_fd, 0, SEEK_END);
+		int file_size = ftell(usr_fd);
+		int total_read = 0;
 
-		while ( !feof(fd) )
+		fseek(usr_fd, 0, SEEK_SET);
+
+		while ( total_read < file_size )
 		{
-			fread(first_record, sizeof(DBUsersInformation), 1, fd);
+			int read_size = fread(first_record, sizeof(DBUsersInformation), 1, usr_fd);
 			if ( first_record->ID > -1 )
 			{
 				non_empty_record = 1;
 				break;
 			}
+			total_read += read_size;
+
+			if ( feof(usr_fd) )
+				break;
 		}
 
 		if ( first_record )
 			free(first_record);
 
-		fseek(fd, 0, SEEK_SET);
+		fseek(usr_fd, 0, SEEK_SET);
 
 		if ( non_empty_record )
 			return 0;
@@ -123,11 +197,11 @@ int db_userinfo_table_is_empty(FILE* fd)
 	return 0;
 }
 
-int db_userinfo_table_is_full(FILE* fd)
+int db_userinfo_table_is_full(FILE* usr_fd)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
 
-	int records_num = db_userinfo_table_get_size(fd);
+	int records_num = db_userinfo_table_get_size(usr_fd);
 
 	if ( records_num > 0 )
 	{
@@ -139,22 +213,30 @@ int db_userinfo_table_is_full(FILE* fd)
 		}
 		int empty_record = 0;
 
-		fseek(fd, 0, SEEK_SET);
+		fseek(usr_fd, 0, SEEK_END);
+		int file_size = ftell(usr_fd);
+		int total_read = 0;
 
-		while ( !feof(fd) )
+		fseek(usr_fd, 0, SEEK_SET);
+
+		while ( total_read < file_size )
 		{
-			fread(first_record, sizeof(DBUsersInformation), 1, fd);
+			int read_size = fread(first_record, sizeof(DBUsersInformation), 1, usr_fd);
 			if ( first_record->ID == -1 )
 			{
 				empty_record = 1;
 				break;
 			}
+			total_read += read_size;
+
+			if ( feof(usr_fd) )
+				break;
 		}
 
 		if ( first_record )
 			free(first_record);
 
-		fseek(fd, 0, SEEK_SET);
+		fseek(usr_fd, 0, SEEK_SET);
 
 		if ( empty_record )
 			return 0;
@@ -176,11 +258,11 @@ FILE* db_create_userinfo_table(int records_num, const char* table_name)
 		return NULL;
 	}
 
-	FILE* fd;
-	if ( (fd = fopen(table_name, "rb+")) == NULL )
+	FILE* usr_fd;
+	if ( (usr_fd = fopen(table_name, "rb+")) == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" file \"%s\" does not exist! Creating new one!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
-		if ( (fd = fopen(table_name, "wb+")) == NULL )
+		if ( (usr_fd = fopen(table_name, "wb+")) == NULL )
 		{
 			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 			return NULL;
@@ -188,7 +270,7 @@ FILE* db_create_userinfo_table(int records_num, const char* table_name)
 	}
 	else
 	{
-		int read_size = db_userinfo_table_get_size(fd);
+		int read_size = db_userinfo_table_get_size(usr_fd);
 		if ( read_size < 0 )
 		{
 			return NULL;
@@ -197,11 +279,11 @@ FILE* db_create_userinfo_table(int records_num, const char* table_name)
 		if ( read_size >= records_num )
 		{
 			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" table \"%s\" is already initialized!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
-			return fd;
+			return usr_fd;
 		}
 
-		fclose(fd);
-		if ( (fd = fopen(table_name, "ab+")) == NULL )
+		fclose(usr_fd);
+		if ( (usr_fd = fopen(table_name, "ab+")) == NULL )
 		{
 			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 			return 0;
@@ -234,16 +316,16 @@ FILE* db_create_userinfo_table(int records_num, const char* table_name)
 		memcpy(new_record->realname, empty_field, strlen(empty_field)+1);
 		memcpy(new_record->quote, empty_field, strlen(empty_field)+1);
 
-		fwrite(new_record, sizeof(DBUsersInformation), 1, fd);
+		fwrite(new_record, sizeof(DBUsersInformation), 1, usr_fd);
 	}
 
 	if ( new_record )
 		free(new_record);
 
-	return fd;
+	return usr_fd;
 }
 
-int db_usersessions_table_get_size(FILE* fd)
+int db_usersessions_table_get_size(FILE* sess_fd)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
 
@@ -255,27 +337,37 @@ int db_usersessions_table_get_size(FILE* fd)
 	}
 	int records_num = 0;
 
-	fseek(fd, 0, SEEK_SET);
+	fseek(sess_fd, 0, SEEK_END);
+	int file_size = ftell(sess_fd);
+	int total_read = 0;
 
-	while ( !feof(fd) )
+	fseek(sess_fd, 0, SEEK_SET);
+
+	while ( total_read < file_size )
 	{
-		fread(record, sizeof(DBXUsersInformation), 1, fd);
+		int read_size = fread(record, sizeof(DBXUsersInformation), 1, sess_fd);
+
+		total_read += read_size;
+
+		if ( feof(sess_fd) )
+			break;
+
 		records_num++;
 	}
 
 	if ( record )
 		free(record);
 
-	fseek(fd, 0, SEEK_SET);
+	fseek(sess_fd, 0, SEEK_SET);
 
 	return records_num;
 }
 
-int db_usersessions_table_is_empty(FILE* fd)
+int db_usersessions_table_is_empty(FILE* sess_fd)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
 
-	int records_num = db_usersessions_table_get_size(fd);
+	int records_num = db_usersessions_table_get_size(sess_fd);
 
 	if ( records_num > 0 )
 	{
@@ -287,22 +379,32 @@ int db_usersessions_table_is_empty(FILE* fd)
 		}
 		int non_empty_record = 0;
 
-		fseek(fd, 0, SEEK_SET);
+		fseek(sess_fd, 0, SEEK_END);
+		int file_size = ftell(sess_fd);
+		int total_read = 0;
 
-		while ( !feof(fd) )
+		fseek(sess_fd, 0, SEEK_SET);
+
+		while ( total_read < file_size )
 		{
-			fread(first_record, sizeof(DBXUsersInformation), 1, fd);
+			int read_size = fread(first_record, sizeof(DBXUsersInformation), 1, sess_fd);
 			if ( first_record->ID > -1 )
 			{
 				non_empty_record = 1;
 				break;
 			}
+
+			total_read += read_size;
+
+			if ( feof(sess_fd) )
+				break;
+
 		}
 
 		if ( first_record )
 			free(first_record);
 
-		fseek(fd, 0, SEEK_SET);
+		fseek(sess_fd, 0, SEEK_SET);
 
 		if ( non_empty_record )
 			return 0;
@@ -314,11 +416,11 @@ int db_usersessions_table_is_empty(FILE* fd)
 	return 0;
 }
 
-int db_usersessions_table_is_full(FILE* fd)
+int db_usersessions_table_is_full(FILE* sess_fd)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
 
-	int records_num = db_usersessions_table_get_size(fd);
+	int records_num = db_usersessions_table_get_size(sess_fd);
 
 	if ( records_num > 0 )
 	{
@@ -330,22 +432,31 @@ int db_usersessions_table_is_full(FILE* fd)
 		}
 		int empty_record = 0;
 
-		fseek(fd, 0, SEEK_SET);
+		fseek(sess_fd, 0, SEEK_END);
+		int file_size = ftell(sess_fd);
+		int total_read = 0;
 
-		while ( !feof(fd) )
+		fseek(sess_fd, 0, SEEK_SET);
+
+		while ( total_read < file_size )
 		{
-			fread(first_record, sizeof(DBXUsersInformation), 1, fd);
+			int read_size = fread(first_record, sizeof(DBXUsersInformation), 1, sess_fd);
 			if ( first_record->ID == -1 )
 			{
 				empty_record = 1;
 				break;
 			}
+
+			total_read += read_size;
+
+			if ( feof(sess_fd) )
+				break;
 		}
 
 		if ( first_record )
 			free(first_record);
 
-		fseek(fd, 0, SEEK_SET);
+		fseek(sess_fd, 0, SEEK_SET);
 
 		if ( empty_record )
 			return 0;
@@ -367,11 +478,11 @@ FILE* db_create_usersessions_table(int records_num, const char* table_name)
 		return NULL;
 	}
 
-	FILE* fd;
-	if ( (fd = fopen(table_name, "rb+")) == NULL )
+	FILE* sess_fd;
+	if ( (sess_fd = fopen(table_name, "rb+")) == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" file \"%s\" does not exist! Creating new one!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
-		if ( (fd = fopen(table_name, "wb+")) == NULL )
+		if ( (sess_fd = fopen(table_name, "wb+")) == NULL )
 		{
 			fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 			return NULL;
@@ -379,7 +490,7 @@ FILE* db_create_usersessions_table(int records_num, const char* table_name)
 	}
 	else
 	{
-		int read_size = db_usersessions_table_get_size(fd);
+		int read_size = db_usersessions_table_get_size(sess_fd);
 		if ( read_size < 0 )
 		{
 			return NULL;
@@ -388,11 +499,11 @@ FILE* db_create_usersessions_table(int records_num, const char* table_name)
 		if ( read_size == records_num )
 		{
 			fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" table \"%s\" is already initialized!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
-			return fd;
+			return sess_fd;
 		}
 
-		fclose(fd);
-		if ( (fd = fopen(table_name, "ab+")) == NULL )
+		fclose(sess_fd);
+		if ( (sess_fd = fopen(table_name, "ab+")) == NULL )
 		{
 			fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 			return NULL;
@@ -427,16 +538,16 @@ FILE* db_create_usersessions_table(int records_num, const char* table_name)
 		memcpy(new_record->registration_date, empty_field, strlen(empty_field)+1);
 		memcpy(new_record->last_date_out, empty_field, strlen(empty_field)+1);
 
-		fwrite(new_record, sizeof(DBXUsersInformation), 1, fd);
+		fwrite(new_record, sizeof(DBXUsersInformation), 1, sess_fd);
 	}
 
 	if ( new_record )
 		free( new_record );
 
-	return fd;
+	return sess_fd;
 }
 
-int db_get_record_index(FILE* fd, const char* search_key)
+int db_get_record_index(FILE* usr_fd, const char* search_key)
 {
 	char cur_time[MAX_TIME_STR_SIZE] = { 0 };
 
@@ -446,7 +557,7 @@ int db_get_record_index(FILE* fd, const char* search_key)
 		return -1;
 	}
 
-	int records_size = db_userinfo_table_get_size(fd);
+	int records_size = db_userinfo_table_get_size(usr_fd);
 	if ( records_size < 1 )
 	{
 		fprintf(stderr, "[%s] %s An internal error occured in \"get_record_index_by_name\" while attempting to get \"record_size\" param. It's 0\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
@@ -475,8 +586,8 @@ int db_get_record_index(FILE* fd, const char* search_key)
 	for ( i = 0; i < records_size; i++ )
 	{
 		memset(record, 0, sizeof(DBUsersInformation));
-		fseek(fd, i * sizeof(DBUsersInformation), SEEK_SET);
-		fread(record, sizeof(DBUsersInformation), 1, fd);
+		fseek(usr_fd, i * sizeof(DBUsersInformation), SEEK_SET);
+		fread(record, sizeof(DBUsersInformation), 1, usr_fd);
 
 		if ( !is_number )
 		{
@@ -494,7 +605,7 @@ int db_get_record_index(FILE* fd, const char* search_key)
 	if ( record )
 		free(record);
 
-	fseek(fd, 0, SEEK_SET);
+	fseek(usr_fd, 0, SEEK_SET);
 
 	if ( i == records_size )
 	{

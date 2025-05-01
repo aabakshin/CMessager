@@ -27,13 +27,15 @@ enum
 enum
 {
 		DB_READLINE,
-		DB_WRITELINE
+		DB_WRITELINE,
+		DB_GET_RECORDS_NUM
 };
 
 const char* db_commands_names[] =
 {
 			"DB_READLINE",
 			"DB_WRITELINE",
+			"DB_GET_RECORDS_NUM",
 			NULL
 };
 
@@ -355,6 +357,27 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 
 		const char* msg_to_send = "DB_LINE_WRITE_ERROR\n";
 		len = strlen(msg_to_send);
+		int wc = write(sess->data->fd, msg_to_send, len);
+		printf("[%s] %s Sent %d\\%d bytes to %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, sess->data->addr);
+	}
+	else if ( strcmp(mes_tokens[0], db_commands_names[DB_GET_RECORDS_NUM]) == 0 )
+	{
+		char send_buf[BUFFER_SIZE] = { 0 };
+
+		int non_empty_records = db_get_non_empty_records(serv_ptr->server_data->user_table_fd);
+		char buf[10];
+		itoa(non_empty_records, buf, 9);
+
+		const char* msg_to_send = "DB_RECORDS_NUM|";
+		int len = strlen(msg_to_send);
+
+		strcpy(send_buf, msg_to_send);
+		len += strlen(buf);
+		strcat(send_buf, buf);
+		send_buf[len] = '\n';
+		len++;
+		send_buf[len] = '\0';
+
 		int wc = write(sess->data->fd, msg_to_send, len);
 		printf("[%s] %s Sent %d\\%d bytes to %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, sess->data->addr);
 	}

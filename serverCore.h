@@ -80,6 +80,7 @@ typedef struct
 
 enum
 {
+		CMD_CODE_INTERNAL_SERVER_ERROR	=			-3,
 		CMD_CODE_OVERLIMIT_LENGTH		=			-2,
 		CMD_CODE_UNKNOWN_COMMAND		=			-1,
 		CMD_CODE_TEXT_MESSAGE			=			 0,
@@ -122,9 +123,9 @@ typedef struct
 /* Client interface */
 void session_send_string(ClientSession *sess, const char *str);
 
-/* Database interface */
-int read_query_from_db(Server* serv_ptr, char* read_buf, const char* search_key);
-int write_query_into_db(Server* serv_ptr, const char** strings_to_query);
+/* low-level interface function to make request to database */
+int request_to_db(Server* serv_ptr, char* response, int response_size, const char** query_strings);
+/* high-level interface function to make request to database */
 int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int field_code);
 
 /* Server interface */

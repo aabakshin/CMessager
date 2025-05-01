@@ -20,6 +20,12 @@ enum
 	MUTE_TIME_LEFT_SIZE			=			  10
 };
 
+enum
+{
+	USERINFO_RECORD_FIELD_COUNT			=			7,
+	USERSESSIONS_RECORD_FIELD_COUNT		=			9
+};
+
 typedef struct
 {
 	int ID;

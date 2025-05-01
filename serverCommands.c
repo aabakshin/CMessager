@@ -123,10 +123,12 @@ void command_overlimit_length_handler(ClientSession *sess)
 void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 {
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
-		return;
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
 
-	char cur_time[CUR_TIME_SIZE];
-	char send_buf[BUFSIZE] = { 0 };
+		return;
+	}
 
 	const char* user_cmd_list[] =
 	{
@@ -174,6 +176,7 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 										NULL
 									};*/
 
+	char cur_time[CUR_TIME_SIZE];
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"help_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -185,7 +188,8 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		session_send_string(sess, "*COMMAND_PARAMS_NO_NEED\n");
 		return;
 	}
-
+	
+	char send_buf[BUFSIZE] = { 0 };
 	const char* help = "*HELP_COMMAND_SUCCESS|";
 	int len = strlen(help);
 	int pos = len;
@@ -203,7 +207,12 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 {
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	char send_buf[BUFSIZE] = { 0 };
 	char cur_time[CUR_TIME_SIZE];
@@ -260,7 +269,12 @@ void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 {
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	char buffer_pass[100];
 	char cur_time[CUR_TIME_SIZE];
@@ -329,9 +343,18 @@ void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 						"undefined",
 						NULL
 		};
-
-		if ( !write_query_into_db(server_ptr, query_strings) )
+		
+		char response[BUFFER_SIZE];
+		if ( !request_to_db(server_ptr, response, BUFFER_SIZE, query_strings) )
 		{
+			sess->state = fsm_error;
+			return;
+		}
+		
+		if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+		{
+			fprintf(stderr, "[%s] %s In function \"chgpass_command_handler\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+			sess->state = fsm_error;
 			return;
 		}
 
@@ -423,7 +446,12 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	char cur_time[CUR_TIME_SIZE];
 
 	if ( (sess == NULL) || (cmd_args == NULL) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	if ( args_num != 2 )
 	{
@@ -450,6 +478,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	char id_param[ID_SIZE];
 	if ( !get_field_from_db(server_ptr, id_param, buffer_username, ID) )
 	{
+		sess->state = fsm_error;
 		return;
 	}
 
@@ -494,6 +523,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			char smt[START_MUTE_TIME_SIZE];
 			if ( !get_field_from_db(server_ptr, smt, server_ptr->sess_array[i]->login, START_MUTE_TIME) )
 			{
+				sess->state = fsm_error;
 				return;
 			}
 			server_ptr->sess_array[i]->start_mute_time = atoi(smt);
@@ -501,6 +531,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			char mt[MUTE_TIME_SIZE];
 			if ( !get_field_from_db(server_ptr, mt, server_ptr->sess_array[i]->login, MUTE_TIME) )
 			{
+				sess->state = fsm_error;
 				return;
 			}
 			server_ptr->sess_array[i]->mute_time = atoi(mt);
@@ -508,6 +539,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			char muted[MUTED_SIZE];
 			if ( !get_field_from_db(server_ptr, muted, server_ptr->sess_array[i]->login, MUTED) )
 			{
+				sess->state = fsm_error;
 				return;
 			}
 			server_ptr->sess_array[i]->muted = atoi(muted);
@@ -535,8 +567,17 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							NULL
 			};
 
-			if ( !write_query_into_db(server_ptr, query_strings) )
+			char response[BUFFER_SIZE];
+			if ( !request_to_db(server_ptr, response, BUFFER_SIZE, query_strings) )
 			{
+				sess->state = fsm_error;
+				return;
+			}
+
+			if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+			{
+				fprintf(stderr, "[%s] %s In function \"op_command_handler\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+				sess->state = fsm_error;
 				return;
 			}
 		}
@@ -551,6 +592,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		char rank[RANK_SIZE];
 		if ( !get_field_from_db(server_ptr, rank, buffer_username, RANK) )
 		{
+			sess->state = fsm_error;
 			return;
 		}
 
@@ -576,9 +618,18 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							"undefined",
 							NULL
 			};
-
-			if ( !write_query_into_db(server_ptr, query_strings) )
+			
+			char response[BUFFER_SIZE];
+			if ( !request_to_db(server_ptr, response, BUFFER_SIZE, query_strings) )
 			{
+				sess->state = fsm_error;
+				return;
+			}
+
+			if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+			{
+				fprintf(stderr, "[%s] %s In function \"chgpass_command_handler\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+				sess->state = fsm_error;
 				return;
 			}
 		}
@@ -654,7 +705,12 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	char cur_time[CUR_TIME_SIZE];
 
 	if ( (sess == NULL) || (cmd_args == NULL) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	if ( args_num != 2 )
 	{
@@ -773,6 +829,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	char id_param[ID_SIZE];
 	if ( !get_field_from_db(server_ptr, id_param, buffer_username, ID) )
 	{
+		sess->state = fsm_error;
 		return;
 	}
 
@@ -822,6 +879,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			char smt[START_MUTE_TIME_SIZE];
 			if ( !get_field_from_db(server_ptr, smt, server_ptr->sess_array[i]->login, START_MUTE_TIME) )
 			{
+				sess->state = fsm_error;
 				return;
 			}
 			server_ptr->sess_array[i]->start_mute_time = atoi(smt);
@@ -829,6 +887,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			char mt[MUTE_TIME_SIZE];
 			if ( !get_field_from_db(server_ptr, mt, server_ptr->sess_array[i]->login, MUTE_TIME) )
 			{
+				sess->state = fsm_error;
 				return;
 			}
 			server_ptr->sess_array[i]->mute_time = atoi(mt);
@@ -836,6 +895,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			char muted[MUTED_SIZE];
 			if ( !get_field_from_db(server_ptr, muted, server_ptr->sess_array[i]->login, MUTED) )
 			{
+				sess->state = fsm_error;
 				return;
 			}
 			server_ptr->sess_array[i]->muted = atoi(muted);
@@ -862,9 +922,18 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							"undefined",
 							NULL
 			};
-
-			if ( !write_query_into_db(server_ptr, query_strings) )
+			
+			char response[BUFFER_SIZE];
+			if ( !request_to_db(server_ptr, response, BUFFER_SIZE, query_strings) )
 			{
+				sess->state = fsm_error;
+				return;
+			}
+
+			if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+			{
+				fprintf(stderr, "[%s] %s In function \"chgpass_command_handler\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+				sess->state = fsm_error;
 				return;
 			}
 		}
@@ -874,6 +943,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		char rank[RANK_SIZE];
 		if ( !get_field_from_db(server_ptr, rank, buffer_username, RANK) )
 		{
+			sess->state = fsm_error;
 			return;
 		}
 
@@ -887,12 +957,14 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			char ldi[LAST_DATE_IN_SIZE];
 			if ( !get_field_from_db(server_ptr, ldi, buffer_username, LAST_DATE_IN) )
 			{
+				sess->state = fsm_error;
 				return;
 			}
 
 			char rd[REG_DATE_SIZE];
 			if ( !get_field_from_db(server_ptr, rd, buffer_username, REGISTRATION_DATE) )
 			{
+				sess->state = fsm_error;
 				return;
 			}
 
@@ -918,9 +990,18 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 							"undefined",
 							NULL
 			};
-
-			if ( !write_query_into_db(server_ptr, query_strings) )
+			
+			char response[BUFFER_SIZE];
+			if ( !request_to_db(server_ptr, response, BUFFER_SIZE, query_strings) )
 			{
+				sess->state = fsm_error;
+				return;
+			}
+
+			if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+			{
+				fprintf(stderr, "[%s] %s In function \"chgpass_command_handler\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+				sess->state = fsm_error;
 				return;
 			}
 		}
@@ -932,7 +1013,12 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 void pm_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 {
 	if ( (sess == NULL) || (cmd_args == NULL) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	int user_offline = 1;
 	char buffer_username[100] = { 0 };
@@ -1007,8 +1093,12 @@ static const char* get_status_str(enum status user_status)
 void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 {
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
-		return;
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
 
+		return;
+	}
 
 	const char* success = "*STATUS_COMMAND_SUCCESS|";
 	char buffer_message[BUFSIZE] = { 0 };
@@ -1139,6 +1229,10 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 	if ( (sess == NULL) || (registered_username == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"user_show_record\" argument \"registered username\" is NULL!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
+
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return NULL;
 	}
 
@@ -1147,6 +1241,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 	if ( !response_struct )
 	{
 		fprintf(stderr, "[%s] %s In function \"user_show_record\" memory error(\"response_struct\" is NULL)\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		sess->state = fsm_error;
 		return NULL;
 	}
 	memset(response_struct, 0, sizeof(ResponseRecord));
@@ -1154,7 +1249,23 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 
 	/* Проверка, существует ли запись с таким именем в таблице БД */
 	char response[BUFFER_SIZE];
-	if ( read_query_from_db(server_ptr, response, registered_username) == -1 )
+	const char* request[] =
+	{
+				"DB_READLINE|",
+				registered_username,
+				NULL
+	};
+
+	if ( !request_to_db(server_ptr, response, BUFFER_SIZE, request) )
+	{
+		if ( response_struct )
+			free(response_struct);
+
+		sess->state = fsm_error;
+		return NULL;
+	}
+	
+	if ( strcmp("DB_LINE_NOT_FOUND", response) == 0 )
 	{
 		if ( response_struct )
 			free(response_struct);
@@ -1173,7 +1284,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 			free(response_struct);
 
 		fprintf(stderr, "[%s] %s [1] In function \"user_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+		sess->state = fsm_error;
 		return NULL;
 	}
 
@@ -1206,7 +1317,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 			free(response_struct);
 
 		fprintf(stderr, "[%s] %s [2] In function \"user_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+		sess->state = fsm_error;
 		return NULL;
 
 	}
@@ -1219,7 +1330,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 			free(response_struct);
 
 		fprintf(stderr, "[%s] %s [3] In function \"user_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+		sess->state = fsm_error;
 		return NULL;
 	}
 
@@ -1231,7 +1342,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 			free(response_struct);
 
 		fprintf(stderr, "[%s] %s [4] In function \"user_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+		sess->state = fsm_error;
 		return NULL;
 
 	}
@@ -1264,7 +1375,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 			free(response_struct);
 
 		fprintf(stderr, "[%s] %s [5] In function \"user_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+		sess->state = fsm_error;
 		return NULL;
 	}
 	strcpy(response_struct->regdate, registration_date);
@@ -1315,7 +1426,23 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 
 
 	char response[BUFFER_SIZE];
-	if ( read_query_from_db(server_ptr, response, registered_username) == -1 )
+	const char* request[] =
+	{
+				"DB_READLINE|",
+				registered_username,
+				NULL
+	};
+
+	if ( !request_to_db(server_ptr, response, BUFFER_SIZE, request) )
+	{
+		if ( response_struct )
+			free(response_struct);
+
+		sess->state = fsm_error;
+		return NULL;
+	}
+
+	if ( strcmp("DB_LINE_NOT_FOUND", response) == 0 )
 	{
 		if ( response_struct )
 			free(response_struct);
@@ -1333,7 +1460,7 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 			free(response_struct);
 
 		fprintf(stderr, "[%s] %s [1] In function \"debug_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+		sess->state = fsm_error;
 		return NULL;
 	}
 
@@ -1411,9 +1538,18 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 									"undefined",
 									NULL
 					};
-
-					if ( !write_query_into_db(server_ptr, query_strings) )
+					
+					char response[BUFFER_SIZE];
+					if ( !request_to_db(server_ptr, response, BUFFER_SIZE, query_strings) )
 					{
+						sess->state = fsm_error;
+						return NULL;
+					}
+
+					if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+					{
+						fprintf(stderr, "[%s] %s In function \"debug_show_record\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+						sess->state = fsm_error;
 						return NULL;
 					}
 
@@ -1441,7 +1577,7 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 				free(response_struct);
 
 			fprintf(stderr, "[%s] %s [2] In function \"debug_show_record\" database server sent invalid answer!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
-			session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+			sess->state = fsm_error;
 			return NULL;
 		}
 
@@ -1486,12 +1622,15 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 	if ( (sess == NULL) || (username == NULL) || (type == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"send_record_response\" \"sess\", \"username\", or \"type\" is NULL\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
 	}
 
+
 	char success_string[BUFSIZE] = { 0 };
 	const char* success_code = "*RECORD_COMMAND_SUCCESS|";
-
 
 	int len = strlen(success_code);
 	int cur_pos = len;
@@ -1508,6 +1647,7 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 		ResponseRecord* response = user_show_record(sess, username, 0);
 		if ( !response )
 		{
+			sess->state = fsm_error;
 			return;
 		}
 
@@ -1543,6 +1683,7 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 		ResponseDebugRecord* response = debug_show_record(sess, username, 0);
 		if ( !response )
 		{
+			sess->state = fsm_error;
 			return;
 		}
 
@@ -1592,7 +1733,12 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	char cur_time[CUR_TIME_SIZE];
 
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	if ( args_num > 3 )
 	{
@@ -1634,8 +1780,22 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	else if ( args_num == 2 )
 	{
 		char response[BUFFER_SIZE];
-		if ( read_query_from_db(server_ptr, response, buffer_param) == -1 )
+		const char* request[] =
 		{
+					"DB_READLINE|",
+					buffer_param,
+					NULL
+		};
+
+		if ( !request_to_db(server_ptr, response, BUFFER_SIZE, request) )
+		{
+			sess->state = fsm_error;
+			return;
+		}
+		
+		if ( strcmp("DB_LINE_NOT_FOUND", response) == 0 )
+		{
+			fprintf(stderr, "[%s] %s In function \"record_command_handler\" unable to find record with \"%s\" name!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE, buffer_param);
 			session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 			return;
 		}
@@ -1643,6 +1803,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		char rank[RANK_SIZE];
 		if ( !get_field_from_db(server_ptr, rank, buffer_param, RANK))
 		{
+			sess->state = fsm_error;
 			return;
 		}
 
@@ -1674,8 +1835,22 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 			else
 			{
 				char response[BUFFER_SIZE];
-				if ( read_query_from_db(server_ptr, response, buffer_param_value) == -1 )
+				const char* request[] =
 				{
+								"DB_READLINE|",
+								buffer_param_value,
+								NULL
+				};
+
+				if ( !request_to_db(server_ptr, response, BUFFER_SIZE, request) )
+				{
+					sess->state = fsm_error;
+					return;
+				}
+				
+				if ( strcmp("DB_LINE_NOT_FOUND", response) == 0 )
+				{
+					fprintf(stderr, "[%s] %s In function \"record_command_handler\" unable to find record with \"%s\" name!\n", get_time_str(cur_time, CUR_TIME_SIZE), ERROR_MESSAGE_TYPE, buffer_param_value);
 					session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
 					return;
 				}
@@ -1726,6 +1901,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				char smt[START_MUTE_TIME_SIZE];
 				if ( !get_field_from_db(server_ptr, smt, sess->login, START_MUTE_TIME) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
 				sess->start_mute_time = atoi(smt);
@@ -1733,6 +1909,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				char mt[MUTE_TIME_SIZE];
 				if ( !get_field_from_db(server_ptr, mt, sess->login, MUTE_TIME) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
 				sess->mute_time = atoi(mt);
@@ -1740,6 +1917,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				char muted[MUTED_SIZE];
 				if ( !get_field_from_db(server_ptr, muted, sess->login, MUTED) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
 				sess->muted = atoi(muted);
@@ -1766,12 +1944,20 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								"undefined",
 								NULL
 				};
-
-				if ( !write_query_into_db(server_ptr, query_strings) )
+				
+				char response[BUFFER_SIZE];
+				if ( !request_to_db(server_ptr, response, BUFFER_SIZE, query_strings) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
-
+				
+				if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+				{
+					fprintf(stderr, "[%s] %s In function \"record_command_handler\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+					sess->state = fsm_error;
+					return;
+				}
 				/* Данные были успешно обновлены */
 			}
 		}
@@ -1798,6 +1984,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				char smt[START_MUTE_TIME_SIZE];
 				if ( !get_field_from_db(server_ptr, smt, sess->login, START_MUTE_TIME) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
 				sess->start_mute_time = atoi(smt);
@@ -1805,6 +1992,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				char mt[MUTE_TIME_SIZE];
 				if ( !get_field_from_db(server_ptr, mt, sess->login, MUTE_TIME) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
 				sess->mute_time = atoi(mt);
@@ -1812,6 +2000,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				char muted[MUTED_SIZE];
 				if ( !get_field_from_db(server_ptr, muted, sess->login, MUTED) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
 				sess->muted = atoi(muted);
@@ -1838,12 +2027,20 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								"undefined",
 								NULL
 				};
-
-				if ( !write_query_into_db(server_ptr, query_strings) )
+				
+				char response[BUFFER_SIZE];
+				if ( !request_to_db(server_ptr, response, BUFFER_SIZE, query_strings) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
 
+				if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+				{
+					fprintf(stderr, "[%s] %s In function \"record_command_handler\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+					sess->state = fsm_error;
+					return;
+				}
 				/* Данные были успешно обновлены */
 			}
 		}
@@ -1888,6 +2085,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				char smt[START_MUTE_TIME_SIZE];
 				if ( !get_field_from_db(server_ptr, smt, sess->login, START_MUTE_TIME) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
 				sess->start_mute_time = atoi(smt);
@@ -1895,6 +2093,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				char mt[MUTE_TIME_SIZE];
 				if ( !get_field_from_db(server_ptr, mt, sess->login, MUTE_TIME) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
 				sess->mute_time = atoi(mt);
@@ -1902,6 +2101,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				char muted[MUTED_SIZE];
 				if ( !get_field_from_db(server_ptr, muted, sess->login, MUTED) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
 				sess->muted = atoi(muted);
@@ -1929,11 +2129,19 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								NULL
 				};
 
-				if ( !write_query_into_db(server_ptr, query_strings) )
+				char response[BUFFER_SIZE];
+				if ( !request_to_db(server_ptr, response, BUFFER_SIZE, query_strings) )
 				{
+					sess->state = fsm_error;
 					return;
 				}
 
+				if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+				{
+					fprintf(stderr, "[%s] %s In function \"record_command_handler\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+					sess->state = fsm_error;
+					return;
+				}
 				/* Данные были успешно обновлены */
 			}
 		}
@@ -1947,6 +2155,9 @@ static void send_mute_response(ClientSession* sess, const char* username)
 {
 	if ( (sess == NULL) || (username == NULL) || (username[0] == '\0') )
 	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
 	}
 
@@ -2025,7 +2236,12 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	char cur_time[CUR_TIME_SIZE];
 
 	if ( (sess == NULL) || (cmd_args == NULL) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	if ( args_num != 3 )
 	{
@@ -2082,6 +2298,7 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	char muted[MUTED_SIZE];
 	if ( !get_field_from_db(server_ptr, muted, username_buf, MUTED) )
 	{
+		sess->state = fsm_error;
 		return;
 	}
 
@@ -2148,8 +2365,17 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 								NULL
 				};
 
-				if ( !write_query_into_db(server_ptr, query_strings) )
+				char response[BUFFER_SIZE];
+				if ( !request_to_db(server_ptr, response, BUFFER_SIZE, query_strings) )
 				{
+					sess->state = fsm_error;
+					return;
+				}
+
+				if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+				{
+					fprintf(stderr, "[%s] %s In function \"mute_command_handler\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+					sess->state = fsm_error;
 					return;
 				}
 
@@ -2166,7 +2392,12 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	char cur_time[CUR_TIME_SIZE];
 
 	if ( (sess == NULL) || (cmd_args == NULL) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	if ( args_num != 2 )
 	{
@@ -2177,6 +2408,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"unmute_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 			cmd_args = NULL;
 		}
+
 		return;
 	}
 
@@ -2200,6 +2432,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	char muted[MUTED_SIZE];
 	if ( !get_field_from_db(server_ptr, muted, username_buf, MUTED) )
 	{
+		sess->state = fsm_error;
 		return;
 	}
 
@@ -2258,8 +2491,17 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 								NULL
 				};
 
-				if ( !write_query_into_db(server_ptr, query_strings) )
+				char response[BUFFER_SIZE];
+				if ( !request_to_db(server_ptr, response, BUFFER_SIZE, query_strings) )
 				{
+					sess->state = fsm_error;
+					return;
+				}
+				
+				if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+				{
+					fprintf(stderr, "[%s] %s In function \"unmute_command_handler\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+					sess->state = fsm_error;
 					return;
 				}
 
@@ -2290,7 +2532,12 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	char cur_time[CUR_TIME_SIZE];
 
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	if ( args_num != 2 )
 	{
@@ -2375,7 +2622,12 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	char cur_time[CUR_TIME_SIZE];
 
 	if ( (sess == NULL) || (cmd_args == NULL) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	if ( args_num != 2 )
 	{
@@ -2399,6 +2651,48 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"table_command_handler\"[2]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CUR_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 		cmd_args = NULL;
 	}
+
+
+	char response[BUFFER_SIZE];
+	const char* request[] =
+	{
+					"DB_GET_RECORDS_NUM\n",
+					NULL
+	};
+
+	if ( !request_to_db(server_ptr, response, BUFFER_SIZE, request) )
+	{
+		sess->state = fsm_error;
+		return;
+	}
+	
+	char* parsed_response[2] = { NULL };
+	int i = 0;
+	char* istr = strtok(response, "|");
+	while ( istr )
+	{
+		parsed_response[i] = istr;
+		i++;
+
+		if ( i >= 2 )
+			break;
+
+		istr = strtok(NULL, "|");
+	}
+
+	if ( strcmp("DB_RECORDS_NUM", parsed_response[0]) != 0 )
+	{
+		sess->state = fsm_error;
+		return;
+	}
+	
+	char records_count_str[100];
+	strcpy(records_count_str, parsed_response[1]);
+	int rec_num_len = strlen(records_count_str);
+	records_count_str[rec_num_len-1] = '\0';
+
+	int records_count = atoi(records_count_str);
+
 
 
 	ConfigFields cfg;
@@ -2611,7 +2905,12 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 void ban_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 {
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	char cur_time[CUR_TIME_SIZE];
 
@@ -2627,7 +2926,12 @@ void ban_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 void unban_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 {
 	if ( (sess == NULL) || (cmd_args == NULL) || (args_num < 1) )
+	{
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
+	}
 
 	char cur_time[CUR_TIME_SIZE];
 
@@ -2760,8 +3064,14 @@ void text_message_handler(ClientSession *sess, const char *msg, int is_private, 
 		}
 	}
 
-	int k;
 	char* buffer_str = malloc(sizeof(char) * BUFSIZE);
+	if ( !buffer_str )
+	{
+		sess->state = fsm_error;
+		return;
+	}
+	
+	int k;
 	for ( k = 0, j = 0; buf[j]; j++, k++ )
 	{
 		if ( buf[j] == ' ' )
@@ -2836,6 +3146,13 @@ char** is_received_message_command(const char* msg, int* cmd_num, int* args_num)
 		}
 
 		cmd_args = malloc(sizeof(char*) * (*args_num));
+		if ( !cmd_args )
+		{
+			*cmd_num = CMD_CODE_INTERNAL_SERVER_ERROR;
+			*args_num = 0;
+			return NULL;
+		}
+
 		int k = 0;
 		int i;
 		istr = strtok(buf, " ");
@@ -2848,12 +3165,28 @@ char** is_received_message_command(const char* msg, int* cmd_num, int* args_num)
 			if ( arg_length > CMD_ARGS_MAX_LENGTH )
 			{
 				free(cmd_args);
-				*cmd_num = -2;
+				*cmd_num = CMD_CODE_OVERLIMIT_LENGTH;
 				*args_num = 0;
 				return NULL;
 			}
 
 			cmd_args[k] = malloc(sizeof(char) * (arg_length + 1));
+			if ( !cmd_args[k] )
+			{
+				for ( int i = 0; i < k; i++ )
+				{
+					if ( cmd_args[i] )
+						free(cmd_args[i]);
+					cmd_args[i] = NULL;
+				}
+
+				free(cmd_args);
+
+				*cmd_num = CMD_CODE_INTERNAL_SERVER_ERROR;
+				*args_num = 0;
+				return NULL;
+			}
+
 			memcpy(cmd_args[k], istr, arg_length+1);
 
 			k++;
@@ -2929,11 +3262,33 @@ char** is_received_message_command(const char* msg, int* cmd_num, int* args_num)
 
 				*args_num = 3;
 				cmd_args = malloc(sizeof(char*) * (*args_num));
+				if ( !cmd_args )
+				{
+					*cmd_num = CMD_CODE_INTERNAL_SERVER_ERROR;
+					*args_num = 0;
+					return NULL;
+				}
 
 				for ( i = 0; i < *args_num; i++ )
 				{
 					int str_len = strlen(args[i]);
 					cmd_args[i] = malloc(sizeof(char) * str_len + 1);
+					if ( !cmd_args[i] )
+					{
+						for ( int k = 0; k < i; k++ )
+						{
+							if ( cmd_args[k] )
+								free(cmd_args[k]);
+							cmd_args[k] = NULL;
+						}
+
+						free(cmd_args);
+
+						*cmd_num = CMD_CODE_INTERNAL_SERVER_ERROR;
+						*args_num = 0;
+						return NULL;
+					}
+
 					memcpy(cmd_args[i], args[i], str_len + 1);
 				}
 			}
@@ -2984,13 +3339,13 @@ char** is_received_message_command(const char* msg, int* cmd_num, int* args_num)
 			free(cmd_args[i]);
 		free(cmd_args);
 
-		*cmd_num = -1;
+		*cmd_num = CMD_CODE_UNKNOWN_COMMAND;
 		*args_num = 0;
 
 		return NULL;
 	}
 
-	*cmd_num = 0;
+	*cmd_num = CMD_CODE_TEXT_MESSAGE;
 	*args_num = 0;
 
 	return NULL;

@@ -3,15 +3,16 @@
 
 #include <stdio.h>
 
-int db_get_new_record_index(FILE* fd);
-int db_userinfo_table_get_size(FILE* fd);
-int db_userinfo_table_is_empty(FILE* fd);
-int db_userinfo_table_is_full(FILE* fd);
+int db_userinfo_table_get_size(FILE* usr_fd);
+int db_userinfo_table_is_empty(FILE* usr_fd);
+int db_userinfo_table_is_full(FILE* usr_fd);
 int db_usersessions_table_get_size(FILE* fd);
 int db_usersessions_table_is_empty(FILE* fd);
 int db_usersessions_table_is_full(FILE* fd);
 
-int db_get_record_index(FILE* fd, const char* search_key);
+int db_get_non_empty_records(FILE* usr_fd);
+int db_get_record_index(FILE* usr_fd, const char* search_key);
+int db_get_new_record_index(FILE* usr_fd);
 
 FILE* db_create_userinfo_table(int records_size, const char* table_name);
 FILE* db_create_usersessions_table(int records_size, const char* table_name);

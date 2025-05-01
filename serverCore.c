@@ -2,6 +2,7 @@
 #define SERVERCORE_C_SENTRY
 
 #include "serverCore.h"
+#include "DatabaseStructures.h"
 #include "DateTime.h"
 #include "Commons.h"
 #include "serverCommands.h"
@@ -141,6 +142,9 @@ void session_send_string(ClientSession *sess, const char *str)
 	if ( (sess == NULL) || (str == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"session_send_string\" params \"sess\" or \"str\" is NULL\n", get_time_str(current_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
 	}
 
@@ -150,6 +154,149 @@ void session_send_string(ClientSession *sess, const char *str)
 
 	view_data(str, bytes_sent, 'c', 50);
 	view_data(str, bytes_sent, 'd', 50);
+}
+
+int request_to_db(Server* serv_ptr, char* response, int response_size, const char** query_strings)
+{
+	char cur_time[CURRENT_TIME_SIZE];
+
+	if ( (query_strings == NULL) || (*query_strings == NULL) || (response == NULL) )
+	{
+		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" \"strings_to_query\" or \"*strings_to_query\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
+	char request_to_db[BUFFER_SIZE];
+	memset(request_to_db, 0, sizeof(request_to_db));
+
+	int i = 1;
+	int len = strlen(query_strings[0]);
+	strcpy(request_to_db, query_strings[0]);
+	while ( query_strings[i] != NULL )
+	{
+		strcat(request_to_db, query_strings[i]);
+		len += strlen(query_strings[i]);
+		request_to_db[len] = '|';
+		len++;
+		request_to_db[len] = '\0';
+		i++;
+	}
+	request_to_db[len-1] = '\n';
+
+	if ( serv_ptr->db_sock < 0 )
+	{
+		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" database socket is less than 0!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
+	int wc = write(serv_ptr->db_sock, request_to_db, len);
+	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, SERVER_DATABASE_ADDR, SERVER_DATABASE_PORT);
+
+
+	/* гарантируем, что следующий вызов read не заблокирует процесс */
+	fd_set readfds;
+	FD_ZERO(&readfds);
+	FD_SET(serv_ptr->db_sock, &readfds);
+	int max_d = serv_ptr->db_sock;
+
+	struct timeval tm;
+	tm.tv_sec = TIMEOUT;
+	tm.tv_usec = 0;
+
+	int res = select(max_d + 1, &readfds, NULL, NULL, &tm);
+	if ( res < 1 )
+	{
+		if ( res == -1 )
+		{
+			if ( errno == EINTR )
+			{
+				if ( sig_number == SIGINT )
+					if ( exit_flag )
+						server_force_stop(serv_ptr);
+				fprintf(stderr, "[%s] %s In function \"read_query_from_db\" received strange signal (#%d)\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sig_number);
+				return 0;
+			}
+
+			fprintf(stderr, "[%s] %s In function \"read_query_from_db\" select() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
+			return 0;
+		}
+
+		fprintf(stderr, "[%s] %s Database server didn't answer too long!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
+	memset(response, 0, response_size);
+	int rc = read(serv_ptr->db_sock, response, response_size);
+	if ( rc < 1 )
+	{
+		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
+	if ( rc < BUFFER_SIZE )
+	{
+		if ( response[rc-1] == '\n' )
+			response[rc-1] = '\0';
+	}
+	else
+	{
+		response[BUFFER_SIZE-1] = '\0';
+	}
+
+	return 1;
+}
+
+int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int field_code)
+{
+	char cur_time[CURRENT_TIME_SIZE];
+
+	if ( (search_key == NULL) || (field == NULL) )
+	{
+		fprintf(stderr, "[%s] %s In function \"get_field_from_db\" \"client_line\" or \"user_pass\" is NULL!", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
+	if ( (field_code < ID) || (field_code > REGISTRATION_DATE) )
+	{
+		fprintf(stderr, "[%s] %s In function \"get_field_from_db\" \"field_code\" has incorrect value!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return 0;
+	}
+
+	char response[BUFFER_SIZE];
+	const char* request[] =
+	{
+			"DB_READLINE|",
+			search_key,
+			NULL
+	};
+
+	if ( !request_to_db(serv_ptr, response, BUFFER_SIZE, request) )
+	{
+		return 0;
+	}
+
+	if ( strcmp("DB_LINE_NOT_FOUND", response) == 0 )
+	{
+		fprintf(stderr, "[%s] %s In function \"get_field_from_db\": Record with key \"%s\" isn't found in database tables!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, search_key);
+		return 0;
+	}
+
+	char* parsed_options[TOKENS_NUM] = { NULL };
+	int i = 0;
+	char* istr = strtok(response, "|");
+	while ( istr )
+	{
+		parsed_options[i] = istr;
+		i++;
+		if ( i >= TOKENS_NUM )
+			break;
+
+		istr = strtok(NULL, "|");
+	}
+
+	strcpy(field, parsed_options[field_code]);
+
+	return 1;
 }
 
 static ClientSession* make_new_session(int sockfd, struct sockaddr_in* from)
@@ -200,6 +347,9 @@ static void session_handler_has_account(Server* serv_ptr, ClientSession* sess, c
 	if ( (sess == NULL) || (client_line == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"session_handler_has_accout\" params \"sess\" or \"client_line\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
 	}
 
@@ -215,231 +365,6 @@ static void session_handler_has_account(Server* serv_ptr, ClientSession* sess, c
 	}
 }
 
-int read_query_from_db(Server* serv_ptr, char* read_buf, const char* search_key)
-{
-	char cur_time[CURRENT_TIME_SIZE];
-
-	if ( (search_key == NULL) || (*search_key == '\0') )
-	{
-		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" \"search_key\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-	char response_to_db[BUFFER_SIZE];
-	memset(response_to_db, 0, sizeof(response_to_db));
-	strcpy(response_to_db, "DB_READLINE|");
-	strcat(response_to_db, search_key);
-	int len = strlen(response_to_db);
-	response_to_db[len] = '\n';
-	response_to_db[len+1] = '\0';
-
-	if ( serv_ptr->db_sock < 0 )
-	{
-		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" database socket is less than 0!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-	int wc = write(serv_ptr->db_sock, response_to_db, len+1);
-	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len+1, SERVER_DATABASE_ADDR, SERVER_DATABASE_PORT);
-
-
-	/* гарантируем, что следующий вызов read не заблокирует процесс */
-	fd_set readfds;
-	FD_ZERO(&readfds);
-	FD_SET(serv_ptr->db_sock, &readfds);
-	int max_d = serv_ptr->db_sock;
-
-	struct timeval tm;
-	tm.tv_sec = TIMEOUT;
-	tm.tv_usec = 0;
-
-	int res = select(max_d + 1, &readfds, NULL, NULL, &tm);
-	if ( res < 1 )
-	{
-		if ( res == -1 )
-		{
-			if ( errno == EINTR )
-			{
-				if ( sig_number == SIGINT )
-					if ( exit_flag )
-						server_force_stop(serv_ptr);
-				fprintf(stderr, "[%s] %s In function \"read_query_from_db\" received strange signal (#%d)\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sig_number);
-				return 0;
-			}
-
-			fprintf(stderr, "[%s] %s In function \"read_query_from_db\" select() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
-			return 0;
-		}
-
-		fprintf(stderr, "[%s] %s Database server didn't answer too long!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-
-	int rc = read(serv_ptr->db_sock, read_buf, sizeof(read_buf));
-	if ( rc < 1 )
-	{
-		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-	if ( rc < BUFFER_SIZE )
-	{
-		if ( read_buf[rc-1] == '\n' )
-			read_buf[rc-1] = '\0';
-	}
-	else
-	{
-		read_buf[BUFFER_SIZE-1] = '\0';
-	}
-
-	if ( strcmp("DB_LINE_NOT_FOUND", read_buf) == 0 )
-	{
-		fprintf(stderr, "[%s] %s In function \"read_query_from_db\" unable to find record with key \"%s\" in database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, search_key);
-		return 0;
-	}
-
-	return 1;
-}
-
-int write_query_into_db(Server* serv_ptr, const char** strings_to_query)
-{
-	char cur_time[CURRENT_TIME_SIZE];
-
-	if ( (strings_to_query == NULL) || (*strings_to_query == NULL) )
-	{
-		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" \"strings_to_query\" or \"*strings_to_query\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-	char response_to_db[BUFFER_SIZE];
-	memset(response_to_db, 0, sizeof(response_to_db));
-
-	int i = 1;
-	int len = strlen(strings_to_query[0]);
-	strcpy(response_to_db, strings_to_query[0]);
-	while ( strings_to_query[i] != NULL )
-	{
-		strcat(response_to_db, strings_to_query[i]);
-		len += strlen(strings_to_query[i]);
-		response_to_db[len] = '|';
-		len++;
-		response_to_db[len] = '\0';
-		i++;
-	}
-	response_to_db[len-1] = '\n';
-
-	if ( serv_ptr->db_sock < 0 )
-	{
-		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" database socket is less than 0!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-	int wc = write(serv_ptr->db_sock, response_to_db, len);
-	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, SERVER_DATABASE_ADDR, SERVER_DATABASE_PORT);
-
-
-	/* гарантируем, что следующий вызов read не заблокирует процесс */
-	fd_set readfds;
-	FD_ZERO(&readfds);
-	FD_SET(serv_ptr->db_sock, &readfds);
-	int max_d = serv_ptr->db_sock;
-
-	struct timeval tm;
-	tm.tv_sec = TIMEOUT;
-	tm.tv_usec = 0;
-
-	int res = select(max_d + 1, &readfds, NULL, NULL, &tm);
-	if ( res < 1 )
-	{
-		if ( res == -1 )
-		{
-			if ( errno == EINTR )
-			{
-				if ( sig_number == SIGINT )
-					if ( exit_flag )
-						server_force_stop(serv_ptr);
-				fprintf(stderr, "[%s] %s In function \"read_query_from_db\" received strange signal (#%d)\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sig_number);
-				return 0;
-			}
-
-			fprintf(stderr, "[%s] %s In function \"read_query_from_db\" select() failed. {%d}\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, errno);
-			return 0;
-		}
-
-		fprintf(stderr, "[%s] %s Database server didn't answer too long!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-
-	char read_buf[BUFFER_SIZE];
-	int rc = read(serv_ptr->db_sock, read_buf, sizeof(read_buf));
-	if ( rc < 1 )
-	{
-		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" database server close connection.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-	if ( rc < BUFFER_SIZE )
-	{
-		if ( read_buf[rc-1] == '\n' )
-			read_buf[rc-1] = '\0';
-	}
-	else
-	{
-		read_buf[BUFFER_SIZE-1] = '\0';
-	}
-
-	if ( strcmp("DB_LINE_WRITE_SUCCESS", read_buf) != 0 )
-	{
-		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-	return 1;
-}
-
-int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int field_code)
-{
-	char cur_time[CURRENT_TIME_SIZE];
-
-	if ( (search_key == NULL) || (field == NULL) )
-	{
-		fprintf(stderr, "[%s] %s In function \"get_field_from_db\" \"client_line\" or \"user_pass\" is NULL!", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-	if ( (field_code < ID) || (field_code > REGISTRATION_DATE) )
-	{
-		fprintf(stderr, "[%s] %s In function \"get_field_from_db\" \"field_code\" has incorrect value!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
-	}
-
-	char read_buf[BUFFER_SIZE];
-	int rqfd_res = read_query_from_db(serv_ptr, read_buf, search_key);
-	if ( !rqfd_res )
-	{
-		return 0;
-	}
-
-	char* parsed_options[TOKENS_NUM] = { NULL };
-	int i = 0;
-	char* istr = strtok(read_buf, "|");
-	while ( istr )
-	{
-		parsed_options[i] = istr;
-		i++;
-		if ( i >= TOKENS_NUM )
-			break;
-
-		istr = strtok(NULL, "|");
-	}
-
-	strcpy(field, parsed_options[field_code]);
-
-	return 1;
-}
-
 static void session_handler_login_wait_login(Server* serv_ptr, ClientSession* sess, const char* client_line)
 {
 	char cur_time[CURRENT_TIME_SIZE];
@@ -449,6 +374,9 @@ static void session_handler_login_wait_login(Server* serv_ptr, ClientSession* se
 		fprintf(stderr, "[%s] %s In function \"session_handler_login_wait_login\":\n"
 						"params \"sess\" or \"client_line\" is NULL OR\n"
 						"\"client_line\" is \"undefined\"\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
 	}
 
@@ -466,6 +394,7 @@ static void session_handler_login_wait_login(Server* serv_ptr, ClientSession* se
 	char id_param[100];
 	if ( !get_field_from_db(serv_ptr, id_param, client_line, ID) )
 	{
+		sess->state = fsm_error;
 		return;
 	}
 
@@ -488,11 +417,14 @@ static void send_message_authorized(Server* serv_ptr, ClientSession* sess, const
 	if ( (sess == NULL) || (str == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"send_message_authorized\" params \"sess\" or \"str\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
 	}
 
 	char message[100];
-
 	int len = strlen(str);
 	int pos = len;
 	memcpy(message, str, len+1);
@@ -553,6 +485,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 	if ( (sess == NULL) || (client_line == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"session_handler_login_wait_pass\" params \"sess\" or \"client_line\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		sess->state = fsm_error;
 		return;
 	}
 
@@ -571,6 +504,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 	char id_param[ID_SIZE];
 	if ( !get_field_from_db(serv_ptr, id_param, sess->login, ID) )
 	{
+		sess->state = fsm_error;
 		return;
 	}
 
@@ -586,6 +520,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 	char pass[PASS_SIZE];
 	if ( !get_field_from_db(serv_ptr, pass, sess->login, PASS) )
 	{
+		sess->state = fsm_error;
 		return;
 	}
 
@@ -599,6 +534,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 
 		if ( !get_field_from_db(serv_ptr, sess->registration_date, sess->login, REGISTRATION_DATE) )
 		{
+			sess->state = fsm_error;
 			return;
 		}
 
@@ -613,6 +549,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		char smt[START_MUTE_TIME_SIZE];
 		if ( !get_field_from_db(serv_ptr, smt, sess->login, START_MUTE_TIME) )
 		{
+			sess->state = fsm_error;
 			return;
 		}
 		sess->start_mute_time = atoi(smt);
@@ -620,6 +557,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		char mt[MUTE_TIME_SIZE];
 		if ( !get_field_from_db(serv_ptr, smt, sess->login, MUTE_TIME) )
 		{
+			sess->state = fsm_error;
 			return;
 		}
 		sess->mute_time = atoi(mt);
@@ -627,6 +565,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		char muted[MUTED_SIZE];
 		if ( !get_field_from_db(serv_ptr, smt, sess->login, MUTED) )
 		{
+			sess->state = fsm_error;
 			return;
 		}
 		sess->muted = atoi(muted);
@@ -654,8 +593,17 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 						NULL
 		};
 
-		if ( !write_query_into_db(serv_ptr, query_strings) )
+		char response[BUFFER_SIZE];
+		if ( !request_to_db(serv_ptr, response, BUFFER_SIZE, query_strings) )
 		{
+			sess->state = fsm_error;
+			return;
+		}
+
+		if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+		{
+			fprintf(stderr, "[%s] %s In function \"session_handler_login_wait_pass\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+			sess->state = fsm_error;
 			return;
 		}
 
@@ -681,6 +629,10 @@ static void session_handler_signup_wait_login(Server* serv_ptr, ClientSession* s
 	if ( (sess == NULL) || (client_line == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"session_handler_signup_wait_login\" params \"sess\" or \"client_line\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
 	}
 
@@ -689,6 +641,7 @@ static void session_handler_signup_wait_login(Server* serv_ptr, ClientSession* s
 		char id_param[ID_SIZE];
 		if ( !get_field_from_db(serv_ptr, id_param, client_line, ID) )
 		{
+			sess->state = fsm_error;
 			return;
 		}
 
@@ -715,6 +668,10 @@ static void session_handler_signup_wait_pass(Server* serv_ptr, ClientSession* se
 	if ( (sess == NULL) || (client_line == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"session_handler_wait_pass\" params \"sess\" or \"client_line\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
 	}
 
@@ -767,8 +724,17 @@ static void session_handler_signup_wait_pass(Server* serv_ptr, ClientSession* se
 						NULL
 		};
 
-		if ( !write_query_into_db(serv_ptr, query_strings) )
+		char response[BUFFER_SIZE];
+		if ( !request_to_db(serv_ptr, response, BUFFER_SIZE, query_strings) )
 		{
+			sess->state = fsm_error;
+			return;
+		}
+
+		if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+		{
+			fprintf(stderr, "[%s] %s In function \"session_handler_signup_wait_pass\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+			sess->state = fsm_error;
 			return;
 		}
 
@@ -794,6 +760,10 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 	if ( (sess == NULL) || (client_line == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"session_handler_wait_message\" params \"sess\" or \"client_line\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
 	}
 
@@ -805,6 +775,9 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 
 	switch ( cmd_num )
 	{
+		case CMD_CODE_INTERNAL_SERVER_ERROR:
+			session_send_string(sess, "*INTERNAL_ERROR\n");
+			break;
 		case CMD_CODE_OVERLIMIT_LENGTH:
 			command_overlimit_length_handler(sess);
 			break;
@@ -996,6 +969,10 @@ static void session_fsm_step(Server* serv_ptr, ClientSession* sess, char* client
 	if ( (sess == NULL) || (client_line == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"session_fsm_step\" params \"sess\" or \"client_line\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
 	}
 
@@ -1038,6 +1015,10 @@ static void session_check_lf(Server* serv_ptr, ClientSession* sess)
 	if ( sess == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"session_handler_wait_message\" params \"sess\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+
+		if ( sess != NULL )
+			sess->state = fsm_error;
+
 		return;
 	}
 
@@ -1077,7 +1058,6 @@ static int session_do_read(Server* serv_ptr, ClientSession* sess)
 	if ( sess == NULL )
 	{
 		fprintf(stderr, "[%s] %s In function \"session_handler_wait_message\" params \"sess\" is NULL\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-
 		return 0;
 	}
 
@@ -1311,8 +1291,15 @@ void server_close_session(int sock_num, Server* serv_ptr)
 					NULL
 	};
 
-	if ( !write_query_into_db(serv_ptr, query_strings) )
+	char response[BUFFER_SIZE];
+	if ( !request_to_db(serv_ptr, response, BUFFER_SIZE, query_strings) )
 	{
+		return;
+	}
+
+	if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
+	{
+		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return;
 	}
 
