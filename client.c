@@ -7,13 +7,13 @@
 
 extern CommandsHistoryList* chl_list;
 
-int exit_flag = 0;
+static int exit_flag = 0;
 
 void exit_handler(int signo)
 {
 	int save_errno = errno;
 	signal(SIGINT, exit_handler);
-	
+
 	exit_flag = 1;
 
 	errno = save_errno;
@@ -29,30 +29,29 @@ int main(int argc, char** argv)
 	time_t start_time = 0;
 	time_t total_time = ANTISPAM_MODULE_TOTAL_TIME_MS;
 
-
-	clear_screen();
+	printf("\033c");
 
 	if ( argc != 3 )
 	{
 		fprintf(stderr, "%s", "\nIncorrect arguments!\nUsage: <program_name> <ip/hostname> <port>\n");
 		return 1;
 	}
-	
+
 	int peer_sock = client_init(argv[1], argv[2]);
 	if ( peer_sock == -1 )
 	{
 		fprintf(stderr, "%s", "\nAn error has occured while executing initial procedure\n");
 		return 1;
 	}
-	
-	clear_screen();
-	
+
+	printf("\033c");
+
 	long long timestamps[2] = { 0 };
 	long long interval;
 	int x = 0;
-	
+
 	srand(time(0));
-	
+
 	/* Выключение канонического режима терминала */
 	struct termios t1, t2;
 	tcgetattr(0, &t1);
@@ -73,11 +72,11 @@ int main(int argc, char** argv)
 		FD_ZERO(&readfds);
 		FD_SET(peer_sock, &readfds);
 		FD_SET(0, &readfds);
-		
+
 		struct timeval timeout;
 		timeout.tv_sec = SELECT_TIMER_SEC;
 		timeout.tv_usec = SELECT_TIMER_MSEC * 1000;
-		
+
 		int res = -1;
 		res = select(peer_sock+1, &readfds, 0, 0, &timeout);
 		if ( res == -1 )
@@ -101,7 +100,7 @@ int main(int argc, char** argv)
 
 			char read_buf[BUFSIZE] = { 0 };
 			int bytes_received = recv(peer_sock, read_buf, BUFSIZE, 0);
-	
+
 			char current_time[MAX_TIME_STR_SIZE];
 			get_time_str(current_time, MAX_TIME_STR_SIZE);
 
@@ -111,8 +110,8 @@ int main(int argc, char** argv)
 				fprintf(stderr, "\nConnection closed by server.\n");
 				break;
 			}
-			
-			
+
+
 			for ( i = 0; i < bytes_received; i++ )
 			{
 				if ( read_buf[i] == '\n' )
@@ -140,7 +139,7 @@ int main(int argc, char** argv)
 
 				continue;
 			}
-			
+
 			printf("\nReceived %d bytes\n", bytes_received);
 			printf("<<< [%s] %s (%s) => %s\n\n", current_time, response_tokens[0], response_tokens[1], response_tokens[2]);
 		}
@@ -153,7 +152,7 @@ int main(int argc, char** argv)
 			do
 			{
 				int str_len = get_str(send_buf, BUFSIZE);
-	
+
 				if ( str_len < 1 )
 				{
 					if ( str_len == EXIT_CODE )
@@ -169,12 +168,13 @@ int main(int argc, char** argv)
 					delete_extra_spaces(send_buf, str_len+1);
 			}
 			while ( (send_buf[0] == '\n') || (send_buf[0] == '\0') );
-			
+
 			if ( return_flag )
 				break;
 
 			int sent_bytes = restrict_message_length(send_buf);
-			
+
+
 			/*								анти-спам модуль								*/
 
 			if ( !start_signal )
@@ -182,7 +182,7 @@ int main(int argc, char** argv)
 				start_time = get_tick_unix();
 				start_signal = 1;
 			}
-			
+
 			timestamps[(x%2)] = get_tick_unix();
 			if ( x < 1 )
 				x++;
@@ -196,7 +196,7 @@ int main(int argc, char** argv)
 			sendall(peer_sock, send_buf, &sent_bytes);
 			printf("Sent %d bytes\n\n", sent_bytes);
 			messages_counter++;
-			
+
 			int len = strlen(send_buf);
 			if ( send_buf[len-1] == '\n' )
 				send_buf[len-1] = '\0';
@@ -213,14 +213,14 @@ int main(int argc, char** argv)
 				start_signal = 0;
 				total_time = get_tick_unix() - start_time;
 			}
-			
+
 			if ( (total_time < ANTISPAM_MODULE_TOTAL_TIME_MS) || (interval < ANTISPAM_MODULE_MESSAGES_INTERVAL) )
 			{
 				messages_counter = 0;
 				start_signal = 0;
 				total_time = ANTISPAM_MODULE_TOTAL_TIME_MS;
 				int number_tries = ANTISPAM_MODULE_TRIES_NUMBER;
-				
+
 				int failed_flag = 0;
 				printf("\n%s\n", "Before send next message, enter the following code(you have 2 tries)");
 				do
@@ -236,7 +236,7 @@ int main(int argc, char** argv)
 
 					int len = get_string(answer, 100);
 					answer[len-1] = '\0';
-					
+
 					if ( strcmp(answer, code) == 0 )
 					{
 						printf("\n%s\n", "You can continue to chat.");

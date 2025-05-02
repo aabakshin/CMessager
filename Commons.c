@@ -206,13 +206,6 @@ unsigned long long get_tick_unix(void)
 	return (cur_time.tv_sec*SEC_MILLISEC_MULTIPLIER + cur_time.tv_nsec/NSEC_MILLISEC_DELIMETER);
 }
 
-void clear_screen(void)
-{
-	int i;
-	for (i = 1; i <= 10; i++)
-		printf("%s", "\n\n\n\n\n\n\n\n\n\n");
-}
-
 void clear_stdin(void)
 {
 	int c;

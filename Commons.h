@@ -84,7 +84,6 @@ int sendall(int s, const char* buf, int* buf_size);
 int restrict_message_length(char* read);
 void delete_extra_spaces(char* read, int read_size);
 char* get_code(void);
-void clear_screen(void);
 void clear_stdin(void);
 void print_record(char** args, int args_size, int debug_mode);
 void itoa(int number, char* num_buf, int max_buf_len);

@@ -277,7 +277,7 @@ int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int
 
 	if ( strcmp("DB_LINE_NOT_FOUND", response) == 0 )
 	{
-		fprintf(stderr, "[%s] %s In function \"get_field_from_db\": Record with key \"%s\" isn't found in database tables!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, search_key);
+		fprintf(stderr, "[%s] %s In function \"get_field_from_db\": Record with key \"%s\" isn't found in database tables!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, search_key);
 		return 0;
 	}
 
