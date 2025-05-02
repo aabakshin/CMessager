@@ -167,21 +167,7 @@ int request_to_db(Server* serv_ptr, char* response, int response_size, const cha
 	}
 
 	char request_to_db[BUFFER_SIZE];
-	memset(request_to_db, 0, sizeof(request_to_db));
-
-	int i = 1;
-	int len = strlen(query_strings[0]);
-	strcpy(request_to_db, query_strings[0]);
-	while ( query_strings[i] != NULL )
-	{
-		strcat(request_to_db, query_strings[i]);
-		len += strlen(query_strings[i]);
-		request_to_db[len] = '|';
-		len++;
-		request_to_db[len] = '\0';
-		i++;
-	}
-	request_to_db[len-1] = '\n';
+	int bytes_to_send = concat_request_strings(request_to_db, BUFFER_SIZE, query_strings);
 
 	if ( serv_ptr->db_sock < 0 )
 	{
@@ -189,8 +175,8 @@ int request_to_db(Server* serv_ptr, char* response, int response_size, const cha
 		return 0;
 	}
 
-	int wc = write(serv_ptr->db_sock, request_to_db, len);
-	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, SERVER_DATABASE_ADDR, SERVER_DATABASE_PORT);
+	int wc = write(serv_ptr->db_sock, request_to_db, bytes_to_send);
+	printf("[%s] %s Sent %d\\%d bytes to %s:%s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, bytes_to_send, SERVER_DATABASE_ADDR, SERVER_DATABASE_PORT);
 
 
 	/* гарантируем, что следующий вызов read не заблокирует процесс */
@@ -265,7 +251,7 @@ int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int
 	char response[BUFFER_SIZE];
 	const char* request[] =
 	{
-			"DB_READLINE|",
+			"DB_READLINE",
 			search_key,
 			NULL
 	};
@@ -452,17 +438,15 @@ static void send_message_authorized(Server* serv_ptr, ClientSession* sess, const
 		return;
 	}
 
-	char message[100];
-	int len = strlen(str);
-	int pos = len;
-	memcpy(message, str, len+1);
+	const char* strings[] =
+	{
+				str,
+				sess->login,
+				NULL
+	};
 
-	len = strlen(sess->login);
-	pos += len;
-	strncat(message, sess->login, len);
-	message[pos] = '\n';
-	pos++;
-	message[pos] = '\0';
+	char message[100];
+	concat_request_strings(message, 100, strings);
 
 	int i;
 	for ( i = 0; i < serv_ptr->sess_array_size; i++ )
@@ -488,22 +472,17 @@ static void success_new_authorized(Server* serv_ptr, ClientSession* sess)
 	}
 
 	char str[BUFSIZE];
-	const char* code = "*SUCCESSFULLY_AUTHORIZED|";
-
-	int len = strlen(code);
-	int pos = len;
-	memcpy(str, code, len+1);
-
-	len = strlen(sess->login);
-	pos += len;
-	strncat(str, sess->login, len);
-	str[pos] = '\n';
-	pos++;
-	str[pos] = '\0';
+	const char* strings[] =
+	{
+			"*SUCCESSFULLY_AUTHORIZED",
+			sess->login,
+			NULL
+	};
+	concat_request_strings(str, BUFSIZE, strings);
 
 	session_send_string(sess, str);
 
-	send_message_authorized(serv_ptr, sess, "*USER_AUTHORIZED|");
+	send_message_authorized(serv_ptr, sess, "*USER_AUTHORIZED");
 }
 
 static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* sess, const char* client_line)
@@ -820,22 +799,17 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 			}
 			else
 			{
-				const char* victim_message = "*MUTE_COMMAND_YOU_MUTED|";
 				char response_victim[100];
-
-				int len = strlen(victim_message);
-				int pos = len;
-				memcpy(response_victim, victim_message, len+1);
-
 				char mtl[10];
 				itoa(sess->mute_time_left, mtl, 9);
-				len = strlen(mtl);
-				pos += len;
-				strncat(response_victim, mtl, len);
-				response_victim[pos] = '\n';
-				pos++;
-				response_victim[pos] = '\0';
+				const char* strings[] =
+				{
+							"*MUTE_COMMAND_YOU_MUTED",
+							mtl,
+							NULL
+				};
 
+				concat_request_strings(response_victim, 100, strings);
 				session_send_string(sess, response_victim);
 			}
 			break;
@@ -880,23 +854,18 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 				pm_command_handler(sess, cmd_args, args_num);
 			else
 			{
-				const char* victim_message = "*MUTE_COMMAND_YOU_MUTED|";
 				char response_victim[100];
-
-				int len = strlen(victim_message);
-				int pos = len;
-				memcpy(response_victim, victim_message, len+1);
-
 				char mtl[10];
 				itoa(sess->mute_time_left, mtl, 9);
-				len = strlen(mtl);
-				pos += len;
-				strncat(response_victim, mtl, len);
-				response_victim[pos] = '\n';
-				pos++;
-				response_victim[pos] = '\0';
-
+				const char* strings[] =
+				{
+							"*MUTE_COMMAND_YOU_MUTED",
+							mtl,
+							NULL
+				};
+				concat_request_strings(response_victim, 100, strings);
 				session_send_string(sess, response_victim);
+
 				if ( !clear_cmd_args(cmd_args, args_num) )
 				{
 					fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"session_handler_wait_message\"[6]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);

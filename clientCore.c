@@ -15,15 +15,18 @@ enum
 };
 
 
-
-
+static void show_logo(void);
+static void print_horizontal_line(int offset, int line_length, char char_line);
+static void print_greeting_text_frame(const char** text_strings, int text_strings_size);
+static int send_answer(int peer_sock, const char** box_messages, int box_messages_size, int max_read_chars);
+static int view_record_success_result(char** response_tokens, int fields_num, int debug_mode);
 
 
 char* get_code(void)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 	const char* symbols = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-	
+
 	char* buf = malloc(CAPTCHA_CODE_LENGTH+1);
 	if ( !buf )
 	{
@@ -42,11 +45,11 @@ char* get_code(void)
 int restrict_message_length(char* read)
 {
 	int length = strlen(read);
-	
+
 	if ( length > MAX_MESSAGE_LENGTH )
 	{
 		read[MAX_MESSAGE_LENGTH] = '\0';
-		
+
 		return MAX_MESSAGE_LENGTH;
 	}
 
@@ -59,36 +62,36 @@ void delete_extra_spaces(char* read, int read_size)
 	///////////////////////////////////////////////////////////
 	int i = 0, c = 0;
 
-	while ( read[i++] == ' ' ) 
+	while ( read[i++] == ' ' )
 		c++;
 
-	for ( i = c; i < read_size; i++ ) 
+	for ( i = c; i < read_size; i++ )
 		read[i-c] = read[i];
 	///////////////////////////////////////////////////////////
-	
+
 	char* message_tokens[MAX_TOKENS_NUM] = { NULL };
 	char* istr = strtok(read, " ");
-			
+
 	int m = 0;
 	i = 0;
 	c = 0;
-			
+
 	while ( istr != NULL )
 	{
 		message_tokens[i] = istr;
-		while ( message_tokens[i][m++] == ' ' ) 
+		while ( message_tokens[i][m++] == ' ' )
 			c++;
 
-		for ( m = c; m < strlen(message_tokens[i])+1; m++ ) 
+		for ( m = c; m < strlen(message_tokens[i])+1; m++ )
 			message_tokens[i][m-c] = message_tokens[i][m];
-		
+
 		i++;
 		m = 0;
 		c = 0;
-		istr = strtok(NULL, " ");	
+		istr = strtok(NULL, " ");
 	}
-	int size = i;	
-				
+	int size = i;
+
 	int k = 0;
 	int j;
 	for ( i = 0; i < size; i++ )
@@ -140,23 +143,23 @@ static void print_greeting_text_frame(const char** text_strings, int text_string
 	for ( i = 0; i < text_strings_size; i++ )
 	{
 		int len = strlen(text_strings[i]);
-		
+
 		if ( len > MAX_STRING_LENGTH-4 )
 			len = MAX_STRING_LENGTH-4;
 
 		print_horizontal_line(0, 14, ' ');
 		print_horizontal_line(0, 2, '#');
-		
+
 		int is_odd = 0;
-		int offset_len; 
-		( ((offset_len = MAX_STRING_LENGTH-4-len) % 2) != 0 ) ? is_odd = 1 : is_odd; 
+		int offset_len;
+		( ((offset_len = MAX_STRING_LENGTH-4-len) % 2) != 0 ) ? is_odd = 1 : is_odd;
 		offset_len /= 2;
 
 		print_horizontal_line(0, offset_len, ' ');
 		int j;
 		for ( j = 0; j < len; j++ )
 			putchar(text_strings[i][j]);
-		( is_odd == 1 ) ? print_horizontal_line(0, offset_len+1, ' ') : print_horizontal_line(0, offset_len, ' ') ; 
+		( is_odd == 1 ) ? print_horizontal_line(0, offset_len+1, ' ') : print_horizontal_line(0, offset_len, ' ');
 
 		print_horizontal_line(0, 2, '#');
 		putchar('\n');
@@ -222,7 +225,7 @@ static int view_record_success_result(char** response_tokens, int fields_num, in
 	}
 
 	print_record(args, fields_num, debug_mode);
-	
+
 	for ( i = 0; i < fields_num; i++ )
 		if ( args[i] )
 			free(args[i]);
@@ -253,7 +256,7 @@ int client_init(const char* address, const char* port)
 		return -1;
 	}
 	addr.sin_port = htons(port_number);
-	
+
 	printf("%s\n", "Creating socket..");
 	int peer_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if ( peer_sock == -1 )
@@ -261,7 +264,7 @@ int client_init(const char* address, const char* port)
 		fprintf(stderr, "socket() failed. {%d}\n", errno);
 		return -1;
 	}
-	
+
 	printf("%s\n", "Connecting...");
 	if ( connect(peer_sock, (struct sockaddr*) &addr, sizeof(addr)) == -1 )
 	{
@@ -294,7 +297,7 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
 		const char* box_messages[] = { "Enter nickname for your account", NULL };
-		
+
 		int box_messages_size = 0;
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
@@ -308,7 +311,7 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
 		const char* box_messages[] = { "This account is already authorized", "Try to use another login", NULL };
-		
+
 		int box_messages_size = 0;
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
@@ -321,8 +324,8 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 	else if ( strcmp(response_tokens[0], "*LOGIN_ALREADY_USED") == 0 )
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
-		const char* box_messages[] = {"This login is already exist in database", "Try another one",  NULL };
-		
+		const char* box_messages[] = { "This login is already exist in database", "Try another one",  NULL };
+
 		int box_messages_size = 0;
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
@@ -335,8 +338,8 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 	else if ( strcmp(response_tokens[0], "*LOGIN_INCORRECT") == 0 )
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
-		const char* box_messages[] = {"Incorrect login!", "Please, check it and try again", NULL};
-		
+		const char* box_messages[] = { "Incorrect login!", "Please, check it and try again", NULL };
+
 		int box_messages_size = 0;
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
@@ -349,8 +352,8 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 	else if ( strcmp(response_tokens[0], "*LOGIN_NOT_EXIST") == 0 )
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
-		const char* box_messages[] = {"This login doesn't exist", "Check your input string", NULL};
-		
+		const char* box_messages[] = { "This login doesn't exist", "Check your input string", NULL };
+
 		int box_messages_size = 0;
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
@@ -363,8 +366,8 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 	else if ( strcmp(response_tokens[0], "*SIGNUP_WAIT_LOGIN") == 0 )
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
-		const char* box_messages[] = {"Enter nickname to create", "new account", NULL};
-		
+		const char* box_messages[] = { "Enter nickname to create", "new account", NULL };
+
 		int box_messages_size = 0;
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;

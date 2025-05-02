@@ -94,6 +94,37 @@ int sendall(int s, const char* buf, int* buf_size)
 	return n == -1 ? -1 : 0;
 }
 
+int concat_request_strings(char* result, int result_size, const char** query_strings)
+{
+	if ( (result == NULL) || (result_size < 1) || (query_strings == NULL) || (*query_strings == NULL) )
+	{
+		return 0;
+	}
+
+	memset(result, 0, result_size);
+	int pos = 0;
+	for ( int i = 0; query_strings[i] != NULL; i++ )
+	{
+		int len = strlen(query_strings[i]);
+		pos += len;
+
+		if ( pos >= result_size )
+		{
+			result[result_size-2] = '\n';
+			result[result_size-1] = '\0';
+			return result_size - 1;
+		}
+
+		strcat(result, query_strings[i]);
+		result[pos] = '|';
+		pos++;
+		result[pos] = '\0';
+	}
+	result[pos-1] = '\n';
+
+	return pos;
+}
+
 unsigned long long get_tick_unix(void)
 {
 	struct timespec cur_time;

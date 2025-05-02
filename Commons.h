@@ -6,7 +6,6 @@
 #define WARN_MESSAGE_TYPE "[WARN]: "
 #define ERROR_MESSAGE_TYPE "[ERROR]: "
 
-
 enum
 {
 	BUFSIZE							=		   1024,
@@ -68,6 +67,7 @@ enum
 int sendall(int s, const char* buf, int* buf_size);
 void itoa(int number, char* num_buf, int max_buf_len);
 char* concat_addr_port(unsigned long ip, unsigned long port);
+int concat_request_strings(char* result, int result_size, const char** query_strings);
 unsigned long long get_tick_unix(void);
 void clear_stdin(void);
 void print_record(char** args, int args_size, int debug_mode);

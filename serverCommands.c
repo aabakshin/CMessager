@@ -36,7 +36,6 @@ const char* valid_commands[] =
 };
 
 
-static void make_send_buf(char* send_buf, int cur_pos, const char* cmd_list[]);
 static const char* get_status_str(enum status user_status);
 static ResponseRecord* user_show_record(ClientSession* sess, const char* registered_username, int show_record_flag);
 static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* registered_username, int show_record_flag);
@@ -73,33 +72,6 @@ int clear_cmd_args(char** cmd_args, int args_num)
 	return 0;
 }
 
-static void make_send_buf(char* send_buf, int cur_pos, const char* cmd_list[])
-{
-	if ( (send_buf == NULL) || (cur_pos < 0) || (cmd_list == NULL) )
-		return;
-
-	int i = 0;
-	while ( cmd_list[i] )
-	{
-		int j;
-		for ( j = 0; cmd_list[i][j]; j++, cur_pos++ )
-			send_buf[cur_pos] = cmd_list[i][j];
-
-		i++;
-		if ( cmd_list[i] )
-		{
-			send_buf[cur_pos] = '|';
-			cur_pos++;
-		}
-		else
-		{
-			send_buf[cur_pos] = '\n';
-			cur_pos++;
-			send_buf[cur_pos] = '\0';
-		}
-	}
-}
-
 void command_overlimit_length_handler(ClientSession *sess)
 {
 	if ( sess == NULL )
@@ -131,6 +103,7 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	const char* user_cmd_list[] =
 	{
+										"*HELP_COMMAND_SUCCESS",
 										"/help - list all valid commands",
 										"/whoih - list all online users",
 										"/changepassword <new_password> - set new password for account",
@@ -142,6 +115,7 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	const char* admin_cmd_list[] =
 	{
+										"*HELP_COMMAND_SUCCESS",
 										"/help - list all valid commands",
 										"/whoih - list all online users",
 										"/changepassword <new_password> - set new password for account",
@@ -159,22 +133,6 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 										NULL
 	};
 
-	/*const char* server_cmd_list[] = {
-										"/help - list all valid commands",
-										"/whoih - list all online users",
-										"/record <debug> <\"username\"> - show user's personal card",
-										"/table <list/\"db_name\"> - print table with specified name",
-										"/mute <user> <duration_in_seconds> - turn off possibility for user to chat",
-										"/unmute <user> - turn on possibility for user to chat",
-										"/ban <username/ip> <\"name\"/\"ip\"> <temp/perm> [duration_in_seconds] - block the user using \"username\" or \"ip\" rule",
-										"/unban <user> - unblock user",
-										"/kick <user> - force disconnect user from chat",
-										"/op <user> - move user in Admin's group",
-										"/deop <user> - remove user from Admin's group",
-										"/stop - save config files, update db records and then stop server",
-										NULL
-									};*/
-
 	char cur_time[CURRENT_TIME_SIZE];
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
@@ -188,18 +146,15 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		return;
 	}
 
-	char send_buf[BUFSIZE] = { 0 };
-	const char* help = "*HELP_COMMAND_SUCCESS|";
-	int len = strlen(help);
-	int pos = len;
-	memcpy(send_buf, help, len+1);
-
+	char send_buf[BUFSIZE];
 	if ( sess->rank != ADMIN_RANK_VALUE )
-		make_send_buf(send_buf, pos, user_cmd_list);
+	{
+		concat_request_strings(send_buf, BUFSIZE, user_cmd_list);
+	}
 	else
-		make_send_buf(send_buf, pos, admin_cmd_list);
-
-
+	{
+		concat_request_strings(send_buf, BUFSIZE, admin_cmd_list);
+	}
 	session_send_string(sess, send_buf);
 }
 
@@ -213,9 +168,7 @@ void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		return;
 	}
 
-	char send_buf[BUFSIZE] = { 0 };
 	char cur_time[CURRENT_TIME_SIZE];
-
 	if ( !clear_cmd_args(cmd_args, args_num) )
 	{
 		fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"whoih_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -228,10 +181,15 @@ void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		return;
 	}
 
-	const char* whoih = "*WHOIH_COMMAND_SUCCESS|";
-	int len = strlen(whoih);
-	int pos = len;
-	memcpy(send_buf, whoih, len+1);
+	int online_count = sl_get_size(server_ptr->clients_online);
+	int strings_size = online_count+2;
+
+	char* strings[strings_size];
+	strings[0] = "*WHOIH_COMMAND_SUCCESS";
+	int j;
+	for ( j = 1; j < strings_size; j++ )
+		strings[j] = NULL;
+	j = 1;
 
 	StringList* clients_list = server_ptr->clients_online;
 	while ( clients_list )
@@ -244,24 +202,15 @@ void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 		if ( (server_ptr->sess_array[i]->user_status != status_invisible) || (sess->rank == ADMIN_RANK_VALUE) )
 		{
-			len = strlen(clients_list->data);
-			pos += len;
-			strncat(send_buf, clients_list->data, len);
+			strings[j] = clients_list->data;
+			j++;
 		}
 
 		clients_list = clients_list->next;
-
-		if ( clients_list )
-		{
-			send_buf[pos] = '|';
-			pos++;
-		}
 	}
 
-	send_buf[pos] = '\n';
-	pos++;
-	send_buf[pos] = '\0';
-
+	char send_buf[BUFSIZE];
+	concat_request_strings(send_buf, BUFSIZE, (const char**)strings);
 	session_send_string(sess, send_buf);
 }
 
