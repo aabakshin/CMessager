@@ -2,69 +2,108 @@
 #define CLIENTCORE_C_SENTRY
 
 #include "Commons.h"
+#include "DateTime.h"
 #include "clientCore.h"
+#include "Input.h"
 
 enum
 {
-	MAX_STRING_LENGTH					=			52,
-	HAS_ACCOUNT_VALUE_LENGTH			=			 3
+	MAX_STRING_LENGTH					=			  52,
+	HAS_ACCOUNT_VALUE_LENGTH			=			   3,
+	VALID_SYMBOLS_NUM					=			  62,
+	MAX_TOKENS_NUM						=			 341,	/* если BUFSIZE = 1024 */
 };
 
-/* Буфер предыдущих отпралвенных команд */
-CommandsHistoryList* chl_list = NULL;
-
-/* Всп. указатель для списка chl_list */
-static CommandsHistoryList* cur_pos = NULL;
-
-/* Конец ввода строки */
-static int end_flag = 1;
-
-extern int exit_flag;
 
 
-int client_init(const char* address, const char* port)
+
+
+
+char* get_code(void)
 {
-	int ok;
-	struct sockaddr_in addr;
-	addr.sin_family = AF_INET;
-
-	ok = inet_aton(address, &(addr.sin_addr));
-	if ( !ok )
-	{
-		fprintf(stderr, "%s", "Incorrect address!\n");
-		return -1;
-	}
-
-	int port_number = atoi(port);
-	if ( port_number < 1024 )
-	{
-		fprintf(stderr, "%s", "Incorrect port number!\n");
-		return -1;
-	}
-	addr.sin_port = htons(port_number);
+	char cur_time[CURRENT_TIME_SIZE];
+	const char* symbols = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 	
-	printf("%s\n", "Creating socket..");
-	int peer_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if ( peer_sock == -1 )
+	char* buf = malloc(CAPTCHA_CODE_LENGTH+1);
+	if ( !buf )
 	{
-		fprintf(stderr, "socket() failed. {%d}\n", errno);
-		return -1;
+		fprintf(stderr, "\n[%s] %s In function \"get_code\" memory error\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		return NULL;
 	}
-	
-	printf("%s\n", "Connecting...");
-	if ( connect(peer_sock, (struct sockaddr*) &addr, sizeof(addr)) == -1 )
-	{
-		fprintf(stderr, "connect() failed. {%d}\n", errno);
-		return -1;
-	}
-	printf("%s\n", "Connected.");
 
-	return peer_sock;
+	int i;
+	for ( i = 0; i < CAPTCHA_CODE_LENGTH; i++ )
+		buf[i] = symbols[rand() % VALID_SYMBOLS_NUM];
+	buf[i] = '\0';
+
+	return buf;
+}
+
+int restrict_message_length(char* read)
+{
+	int length = strlen(read);
+	
+	if ( length > MAX_MESSAGE_LENGTH )
+	{
+		read[MAX_MESSAGE_LENGTH] = '\0';
+		
+		return MAX_MESSAGE_LENGTH;
+	}
+
+	return length;
+}
+
+void delete_extra_spaces(char* read, int read_size)
+{
+	/* Удаляет пробела из начала сообщения */
+	///////////////////////////////////////////////////////////
+	int i = 0, c = 0;
+
+	while ( read[i++] == ' ' ) 
+		c++;
+
+	for ( i = c; i < read_size; i++ ) 
+		read[i-c] = read[i];
+	///////////////////////////////////////////////////////////
+	
+	char* message_tokens[MAX_TOKENS_NUM] = { NULL };
+	char* istr = strtok(read, " ");
+			
+	int m = 0;
+	i = 0;
+	c = 0;
+			
+	while ( istr != NULL )
+	{
+		message_tokens[i] = istr;
+		while ( message_tokens[i][m++] == ' ' ) 
+			c++;
+
+		for ( m = c; m < strlen(message_tokens[i])+1; m++ ) 
+			message_tokens[i][m-c] = message_tokens[i][m];
+		
+		i++;
+		m = 0;
+		c = 0;
+		istr = strtok(NULL, " ");	
+	}
+	int size = i;	
+				
+	int k = 0;
+	int j;
+	for ( i = 0; i < size; i++ )
+	{
+		for ( j = 0; j < strlen(message_tokens[i]); j++ )
+			read[k++] = message_tokens[i][j];
+		read[k++] = ' ';
+	}
+	read[k-1] = '\0';
 }
 
 static void show_logo(void)
 {
-	printf( "%s",  
+	printf("\033c");
+	printf("%s",
 					"   $$$$$$$$\\  $$$$$$\\  $$$$$$$\\        $$$$$$\\  $$\\   $$\\  $$$$$$\\ $$$$$$$$\\\n"
 					"   \\__$$  __|$$  __$$\\ $$  __$$\\      $$  __$$\\ $$ |  $$ |$$  __$$\\\\__$$  __|\n"
 					"      $$ |   $$ /  \\__|$$ |  $$ |     $$ /  \\__|$$ |  $$ |$$ /  $$ |  $$ |   \n"
@@ -73,8 +112,8 @@ static void show_logo(void)
 					"      $$ |   $$ |  $$\\ $$ |           $$ |  $$\\ $$ |  $$ |$$ |  $$ |  $$ |    \n"
 					"      $$ |   \\$$$$$$  |$$ |           \\$$$$$$  |$$ |  $$ |$$ |  $$ |  $$ |    \n"
 					"      \\__|    \\______/ \\__|            \\______/ \\__|  \\__|\\__|  \\__|  \\__|\n"
-					"\n\n"
-		  );
+					"\n\n");
+	fflush(stdout);
 }
 
 static void print_horizontal_line(int offset, int line_length, char char_line)
@@ -129,23 +168,22 @@ static void print_greeting_text_frame(const char** text_strings, int text_string
 	printf("%s", "Your answer: ");
 }
 
-static void send_answer(int peer_sock, const char** box_messages, int box_messages_size, int max_read_chars)
+static int send_answer(int peer_sock, const char** box_messages, int box_messages_size, int max_read_chars)
 {
-	/* Размер message должен быть как минимум max_read_chars+2 байт*/
+	// Размер message должен быть как минимум max_read_chars+2 байт
 	char message[100] = { 0 };
 	int len = 0;
 
 	do
 	{
-		clear_screen();
+		printf("\033c");
 		show_logo();
 		print_greeting_text_frame(box_messages, box_messages_size);
-		len = get_str(message, max_read_chars);
-		
+		len = input(message, max_read_chars);
+
 		if ( len == EXIT_CODE )
 		{
-			exit_flag = 1;
-			return;
+			return 0;
 		}
 	}
 	while ( len < 2 );
@@ -155,6 +193,8 @@ static void send_answer(int peer_sock, const char** box_messages, int box_messag
 
 	sendall(peer_sock, message, &len);
 	printf("Sent %d bytes\n", len);
+
+	return 1;
 }
 
 static int view_record_success_result(char** response_tokens, int fields_num, int debug_mode)
@@ -193,408 +233,44 @@ static int view_record_success_result(char** response_tokens, int fields_num, in
 	return 1;
 }
 
-
-/* 
- * Обработка терминального ввода в ручном режиме при помощи termios
- * Реализация некоторых возможностей терминала
- * Получение строки из станд.потока ввода через низкоуровненые функции и обработка
- * содержимого с учётом использования многобайтных символов
- */
-
-int get_str(char* buffer, int buffer_size)
+int client_init(const char* address, const char* port)
 {
-	if ( (buffer == NULL) || (buffer_size < 2) )
-		return -1;
+	int ok;
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
 
-	char read_sym[10] = { 0 };
-	int i = 0;
-	int left_offset = 0;
-
-	while ( 1 )
+	ok = inet_aton(address, &(addr.sin_addr));
+	if ( !ok )
 	{
-		int rc = read(0, read_sym, 6);	/* 6 - макс. размер в байтах кода клавиши на клавиатуре(F1-F12) */
-		if ( rc < 1 )
-			continue;
-		
-		if ( rc == 1 )
-		{
-			if ( read_sym[0] == 3 ) /* Ctrl-C */
-			{
-				/* завершение программы */
-				return EXIT_CODE;
-			}
-			else if ( (read_sym[0] == 4) || (read_sym[0] == '\n') ) /* 4 => EOF или Ctrl-D */
-			{
-				end_flag = 1;
-				write(1, &read_sym[0], 1);
-
-				if ( i < buffer_size-1 )
-				{
-					buffer[i] = '\n';
-					i++;
-					buffer[i] = '\0';
-					break;
-				}
-				buffer[buffer_size-2] = '\n';
-				buffer[buffer_size-1] = '\0';
-				
-				i = buffer_size-1;
-				
-				break;
-			}
-			else if ( (read_sym[0] == '\b') || (read_sym[0] == 127) )	/* Обработка backspace */
-			{
-				if ( left_offset < 1 )
-				{
-					if ( i > 0 )
-						i--;
-					printf("%s", "\b \b");
-					fflush(stdout);
-				}
-				else
-				{
-					char buf[buffer_size];
-					int x, z = 0;
-
-					i -= left_offset;
-					if ( i < 1 )
-					{
-						i += left_offset;
-						continue;
-					}
-					
-					for ( x = i; x < i+left_offset; x++, z++ )
-						buf[z] = buffer[x];
-					buf[z] = '\0';
-
-					i--;
-					for ( x = 0; buf[x]; x++ )
-					{
-						buffer[i] = buf[x];
-						i++;
-					}
-
-					int shift = 0;
-					putchar('\b');
-					for ( x = 0; buf[x]; x++ )
-					{
-						putchar(buf[x]);
-						shift++;
-					}
-					putchar(' ');
-					shift++;
-					for ( x = 1; x <= shift; x++ )
-						putchar('\b');
-					fflush(stdout);
-				}
-
-				continue;
-			}
-			else if ( read_sym[0] == 23 ) /* Ctrl-W удаление последнего слова */
-			{
-				if ( i < 1 )
-					continue;
-
-				int last_ch = i-1;
-				int cur_pos = i-left_offset;
-				int pos = cur_pos;
-
-				char buf[buffer_size];
-				if ( cur_pos > 0 )
-				{
-					if ( buffer[cur_pos-1] == ' ' )
-						while ( (cur_pos > 0) && (buffer[cur_pos-1] == ' ')  )
-							cur_pos--;
-
-					if ( cur_pos > 0 )
-						while ( (cur_pos > 0) && (buffer[cur_pos-1] != ' ') )
-							cur_pos--;
-
-					i = cur_pos;
-					int save_i = i;
-
-					int k;
-					for ( k = 1; k <= (pos-cur_pos); k++ )
-					{
-						printf("\b \b");
-						fflush(stdout);
-					}
-
-					int x = 0;
-					for ( k = pos; k <= last_ch; k++ )
-					{
-						buf[x] = buffer[k];
-						x++;
-					}
-					buf[x] = '\0';
-
-					for ( x = 0; buf[x]; x++ )
-					{
-						buffer[i] = buf[x];
-						putchar(buffer[i]);
-						i++;
-					}
-					fflush(stdout);
-
-					if ( buf[0] != '\0' )
-					{
-						for ( x = i; x <= last_ch; x++ )
-							putchar(' ' );
-						for ( ; x > save_i; x-- )
-							putchar('\b');
-						fflush(stdout);
-					}
-				}
-				continue;
-			}
-			
-			int spec_flag = 0;
-			int save_pos = 0; 
-
-			if ( left_offset > 0 )
-			{
-				spec_flag = 1;
-				char buf[buffer_size];
-				int x, j = 0;
-				int last_ch = i-1;
-
-				i -= left_offset;
-				save_pos = i;
-				for ( x = i; x <= last_ch; x++ )
-				{
-					buf[j] = buffer[x];
-					j++;
-				}
-				buf[j] = '\0';
-
-				buffer[i] = read_sym[0];
-				i++;
-				
-				for ( x = 0; buf[x]; x++ )
-				{
-					if ( i < buffer_size-1 )
-					{
-						buffer[i] = buf[x];
-						i++;
-					}
-					else
-						break;
-				}
-			}
-			else
-			{
-				buffer[i] = read_sym[0];
-				i++;
-			}
-
-			if ( i > buffer_size-2 )
-			{
-				buffer[buffer_size-2] = '\n';
-				buffer[buffer_size-1] = '\0';
-				
-				i = buffer_size-1;
-
-				break;
-			}
-			
-			
-			if ( spec_flag )
-			{
-				spec_flag = 0;
-				int l_char = i-1;
-				int cur_pos = i;
-				while ( cur_pos >= 0 )
-				{
-					putchar('\b');
-					fflush(stdout);
-					cur_pos--;
-				}
-				for ( cur_pos = 0; cur_pos <= l_char; cur_pos++ )
-					write(1, &buffer[cur_pos], 1);
-
-				while ( cur_pos > save_pos+1 )
-				{
-					putchar('\b');
-					fflush(stdout);
-					cur_pos--;
-				}
-			}
-			else
-			{
-				write(1, &read_sym[0], 1);
-			}
-		}
-		else if ( rc == 3 )
-		{
-			/* обработка клавиши ARROW_LEFT с 3-байтным кодом */
-			if (
-						( read_sym[0] == 0x1b )		&&			/* 27 */
-						( read_sym[1] == 0x5b )		&&			/* 91 */
-						( read_sym[2] == 0x44 )					/* 68 */
-			   )
-			{
-				if ( left_offset < i )
-				{
-					putchar('\b');
-					fflush(stdout);
-					left_offset++;
-				}
-			}
-
-			/* обработка клавиши ARROW_RIGHT с 3-байтным кодом */
-			else if (
-							( read_sym[0] == 0x1b )		&&		/* 27 */
-							( read_sym[1] == 0x5b )		&&		/* 91 */
-							( read_sym[2] == 0x43 )				/* 67 */
-					)
-			{
-				if ( left_offset > 0 )
-				{
-					putchar(' ');
-					putchar('\b');
-					putchar(buffer[i-left_offset]);
-					left_offset--;
-				}
-				fflush(stdout);
-			}
-			
-			/* обработка клавиши ARROW_UP с 3-байтным кодом */
-			else if (     
-							( read_sym[0] == 0x1b )		&&		/* 27 */
-							( read_sym[1] == 0x5b )		&&		/* 91 */
-							( read_sym[2] == 0x41 )				/* 65 */
-					)
-			{
-					if ( chl_list != NULL )
-					{
-						if ( i > 0 )
-						{
-							i--;		
-							while ( i >= 0 )
-							{
-								buffer[i] = 0;
-								printf("%s", "\b \b");
-								i--;
-							}
-							i = 0;
-							fflush(stdout);
-						}
-
-						
-						if ( end_flag )
-						{
-							end_flag = 0;
-							if ( chl_list->prev != NULL)
-								cur_pos = chl_list->prev;
-							else
-								cur_pos = chl_list;							
-						}
-						else
-						{
-							if ( cur_pos->prev != NULL )
-								cur_pos = cur_pos->prev;
-						}
-
-						int j;
-						for ( j = 0; cur_pos->command[j] && (j < buffer_size-2); j++, i++ )
-							buffer[i] = cur_pos->command[j];
-						
-
-						printf("%s", cur_pos->command);
-						fflush(stdout);
-					}
-			}
-
-			/* обработка клавиши ARROW_DOWN с 3-х байтным кодом */
-			else if (     
-							( read_sym[0] == 0x1b )		&&		/* 27 */
-							( read_sym[1] == 0x5b )		&&		/* 91 */
-							( read_sym[2] == 0x42 )				/* 66 */
-					)
-			{
-					if ( chl_list != NULL )
-					{
-						if ( i > 0 )
-						{
-							i--;		
-							while ( i >= 0 )
-							{
-								buffer[i] = 0;
-								printf("%s", "\b \b");
-								i--;
-							}
-							i = 0;
-							fflush(stdout);
-						}
-
-						
-						if ( end_flag )
-						{
-							end_flag = 0;
-							cur_pos = chl_list;
-						}
-						else
-						{
-							if ( cur_pos->next != NULL )
-								cur_pos = cur_pos->next;
-						}
-						
-						int j;
-						for ( j = 0; cur_pos->command[j] && (j < buffer_size-2); j++, i++ )
-							buffer[i] = cur_pos->command[j];
-						
-
-						printf("%s", cur_pos->command);
-						fflush(stdout);
-					}
-			}
-		}
-		else if ( rc == 4 )
-		{
-			/* обработка клавиши DEL с 4-х байтным кодом */
-			if (
-						( read_sym[0] == 0x1b )		&&		/* 27 */
-						( read_sym[1] == 0x5b )		&&		/* 91 */
-						( read_sym[2] == 0x33 )		&&		/* 51 */
-						( read_sym[3] == 0x7e )				/* 126 */
-			   )
-			{
-				if ( left_offset > 0 )
-				{
-					char buf[buffer_size];
-					int last_ch = i-1;
-					int cur_pos = i-left_offset;
-					int k;
-					int x = 0;
-					for ( k = cur_pos+1; k <= last_ch; k++ )
-					{
-						buf[x] = buffer[k];
-						x++;
-					}
-					buf[x] = '\0';
-
-					x = 0;
-					for ( k = cur_pos; buf[x]; x++, k++ )
-					{
-						buffer[k] = buf[x];
-						putchar(buffer[k]);
-					}
-					putchar(' ');
-					fflush(stdout);
-
-					for ( ; k >= cur_pos; k-- )
-						putchar('\b');
-					fflush(stdout);
-
-					if ( i > 0 )
-						i--;
-					left_offset--;
-				}
-			}
-		}
+		fprintf(stderr, "%s", "Incorrect address!\n");
+		return -1;
 	}
 
-	return i;
+	int port_number = atoi(port);
+	if ( port_number < 1024 )
+	{
+		fprintf(stderr, "%s", "Incorrect port number!\n");
+		return -1;
+	}
+	addr.sin_port = htons(port_number);
+	
+	printf("%s\n", "Creating socket..");
+	int peer_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if ( peer_sock == -1 )
+	{
+		fprintf(stderr, "socket() failed. {%d}\n", errno);
+		return -1;
+	}
+	
+	printf("%s\n", "Connecting...");
+	if ( connect(peer_sock, (struct sockaddr*) &addr, sizeof(addr)) == -1 )
+	{
+		fprintf(stderr, "connect() failed. {%d}\n", errno);
+		return -1;
+	}
+	printf("%s\n", "Connected.");
+
+	return peer_sock;
 }
 
 /* Обработка полученной информации от сервера в соответствии с протоколом общения */
@@ -609,7 +285,9 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
-		send_answer(peer_sock, box_messages, box_messages_size, max_read_chars);
+		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
+			return 0;
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], "*LOGIN_WAIT_LOGIN") == 0 )
@@ -621,7 +299,9 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
-		send_answer(peer_sock, box_messages, box_messages_size, max_read_chars);
+		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
+			return 0;
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], "*LOGIN_ALREADY_AUTHORIZED") == 0 )
@@ -633,7 +313,9 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
-		send_answer(peer_sock, box_messages, box_messages_size, max_read_chars);
+		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
+			return 0;
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], "*LOGIN_ALREADY_USED") == 0 )
@@ -645,7 +327,9 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
-		send_answer(peer_sock, box_messages, box_messages_size, max_read_chars);
+		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
+			return 0;
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], "*LOGIN_INCORRECT") == 0 )
@@ -657,7 +341,9 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
-		send_answer(peer_sock, box_messages, box_messages_size, max_read_chars);
+		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
+			return 0;
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], "*LOGIN_NOT_EXIST") == 0 )
@@ -669,7 +355,9 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
-		send_answer(peer_sock, box_messages, box_messages_size, max_read_chars);
+		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
+			return 0;
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], "*SIGNUP_WAIT_LOGIN") == 0 )
@@ -681,7 +369,9 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
-		send_answer(peer_sock, box_messages, box_messages_size, max_read_chars);
+		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
+			return 0;
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], "*LOGIN_WAIT_PASS") == 0 )
@@ -693,7 +383,9 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
-		send_answer(peer_sock, box_messages, box_messages_size, max_read_chars);
+		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
+			return 0;
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], "*NEW_PASS_INCORRECT") == 0 )
@@ -705,7 +397,9 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
-		send_answer(peer_sock, box_messages, box_messages_size, max_read_chars);
+		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
+			return 0;
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], "*PASS_NOT_MATCH") == 0 )
@@ -717,7 +411,9 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
-		send_answer(peer_sock, box_messages, box_messages_size, max_read_chars);
+		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
+			return 0;
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], "*SIGNUP_WAIT_PASS") == 0 )
@@ -729,7 +425,9 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
-		send_answer(peer_sock, box_messages, box_messages_size, max_read_chars);
+		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
+			return 0;
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], "*USER_AUTHORIZED") == 0 )
@@ -754,7 +452,7 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 	}
 	else if ( strcmp(response_tokens[0], "*CANNOT_CONNECT_DATABASE") == 0 )
 	{
-		clear_screen();
+		printf("\033c");
 		fprintf(stderr, "Server cannot connect to database file. Try later\n");
 
 		return 1;
@@ -911,7 +609,7 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		}
 		else if ( strcmp(response_tokens[1], "VICTIM") == 0 )
 		{
-			clear_screen();
+			printf("\033c");
 			printf("%s\n", "You have been kicked from the chat.");
 		}
 		return 1;
@@ -1074,7 +772,7 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 	}
 	else if ( strcmp(response_tokens[0], "*SUCCESSFULLY_AUTHORIZED") == 0 )
 	{
-		clear_screen();
+		printf("\033c");
 		printf("%s\n%s%s%s\n%s\n", "Welcome to GLOBAL chat room!",
 				                   "You authorized here as \"", response_tokens[1],
 								   "\"\nTo start chatting, just type text with ending ENTER",

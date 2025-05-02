@@ -5,7 +5,9 @@
 #include "../Commons.h"
 #include "../DateTime.h"
 #include "../DatabaseStructures.h"
+#include <stdlib.h>
 #include <ctype.h>
+#include <string.h>
 
 static const char* empty_field = "undefined";
 

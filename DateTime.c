@@ -49,7 +49,7 @@ unsigned long long get_date_num(const char *date)
 	memset(&time, 0, sizeof(time));
 
 	strptime(date, "%a %d %b %Y %H:%M:%S", &time);
-	
+
 	return mktime(&time);
 }
 

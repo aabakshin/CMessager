@@ -85,20 +85,20 @@ const char* sl_remove(StringList** list_ptr, const char* data)
 			*list_ptr = (*list_ptr)->next;
 
 		}
-		
+
 		free(tempPtr);
 
 		return data;
 	}
-	
+
 	if ( curPtr->next == NULL )
 	{
 		prevPtr->next = NULL;
 		free(tempPtr);
-		
+
 		return data;
 	}
-	
+
 	prevPtr->next = curPtr->next;
 	curPtr->next->prev = prevPtr;
 	free(tempPtr);
@@ -119,7 +119,7 @@ int sl_get_size(StringList* list)
 		size++;
 		list = list->next;
 	}
-	
+
 	return size;
 }
 
@@ -140,10 +140,10 @@ int sl_clear(StringList** list_ptr)
 		if ( sl_remove(list_ptr, list->data) != NULL )
 			removed++;
 	}
-	
+
 	if ( removed == size )
 		return 1;
-	
+
 	fprintf(stderr, "%s", "\n[StringList]: In function \"sl_clear\" error: unable to clear list\n");
 	return 0;
 }
@@ -155,7 +155,7 @@ void sl_print(StringList* list)
 		fprintf(stderr, "%s", "\n[StringList]: In function \"sl_print\" error: list is empty!\n");
 		return;
 	}
-	
+
 	printf("%s", "\nStringList is: ");
 	while ( list != NULL )
 	{

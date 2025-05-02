@@ -1,4 +1,3 @@
-#include "SessionList.h"
 #include "serverDatabase.h"
 #include "../Commons.h"
 #include "../DateTime.h"
@@ -20,7 +19,7 @@ int main(int argc, char** argv)
 		fprintf(stderr, "[%s] %s Incorrect port number\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 2;
 	}
-	
+
 	InitDbServData srv_data;
 	memset(&srv_data, 0, sizeof(InitDbServData));
 

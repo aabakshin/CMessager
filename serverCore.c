@@ -6,7 +6,6 @@
 #include "DateTime.h"
 #include "Commons.h"
 #include "serverCommands.h"
-#include <signal.h>
 
 
 static int session_do_read(Server* serv_ptr, ClientSession* sess);
@@ -20,6 +19,7 @@ static void session_handler_signup_wait_login(Server* serv_ptr, ClientSession* s
 static void session_handler_signup_wait_pass(Server* serv_ptr, ClientSession* sess, const char* client_line);
 static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, const char* client_line);
 
+static int check_client_answer(const char* answer);
 static ClientSession* make_new_session(int sockfd, struct sockaddr_in* from);
 static void send_message_authorized(Server* serv_ptr, ClientSession* sess, const char* str);
 static void success_new_authorized(Server* serv_ptr, ClientSession* sess);
@@ -297,6 +297,34 @@ int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int
 	strcpy(field, parsed_options[field_code]);
 
 	return 1;
+}
+
+static int check_client_answer(const char* answer)
+{
+	const char* check_for[] =
+	{
+					"y",
+					"Y",
+					"ye",
+					"yE",
+					"Ye",
+					"YE",
+					"yes",
+					"Yes",
+					"yEs",
+					"yeS",
+					"YEs",
+					"YeS",
+					"yES",
+					"YES",
+					NULL
+	};
+
+	for ( int i = 0; check_for[i]; i++ )
+		if ( strcmp(answer, check_for[i]) == 0 )
+			return 1;
+
+	return 0;
 }
 
 static ClientSession* make_new_session(int sockfd, struct sockaddr_in* from)

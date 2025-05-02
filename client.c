@@ -1,13 +1,13 @@
 #include "Commons.h"
 #include "clientCore.h"
 #include "DateTime.h"
-#include <termios.h>
-#include <signal.h>
+#include "Input.h"
+#include "CommandsHistoryList.h"
 
 
 extern CommandsHistoryList* chl_list;
-
 static int exit_flag = 0;
+
 
 void exit_handler(int signo)
 {
@@ -51,20 +51,6 @@ int main(int argc, char** argv)
 	int x = 0;
 
 	srand(time(0));
-
-	/* Выключение канонического режима терминала */
-	struct termios t1, t2;
-	tcgetattr(0, &t1);
-	memcpy(&t2, &t1, sizeof(t1));
-
-	t1.c_lflag &= ~ICANON;
-	t1.c_lflag &= ~ISIG;
-	t1.c_lflag &= ~ECHO;
-	t1.c_cc[VMIN] = 0;
-	t1.c_cc[VTIME] = 0;
-
-	tcsetattr(0, TCSANOW, &t1);
-	/*********************************************/
 
 	while ( 1 )
 	{
@@ -151,7 +137,7 @@ int main(int argc, char** argv)
 			char send_buf[BUFSIZE] = { 0 };
 			do
 			{
-				int str_len = get_str(send_buf, BUFSIZE);
+				int str_len = input(send_buf, BUFSIZE);
 
 				if ( str_len < 1 )
 				{
@@ -234,7 +220,7 @@ int main(int argc, char** argv)
 					}
 					printf("\nYour code: %s\n", code);
 
-					int len = get_string(answer, 100);
+					int len = input(answer, 100);
 					answer[len-1] = '\0';
 
 					if ( strcmp(answer, code) == 0 )
@@ -261,9 +247,6 @@ int main(int argc, char** argv)
 		}
     }
 
-	/* восстановление канонического режима */
-	tcsetattr(0, TCSANOW, &t2);
-
 	/* очистка буфера отправленных команд */
 	chl_clear(&chl_list);
 
@@ -271,7 +254,6 @@ int main(int argc, char** argv)
 	close(peer_sock);
 
 	printf("\n%s\n", "Finished");
-	fflush(stdout);
 
 	return 0;
 }

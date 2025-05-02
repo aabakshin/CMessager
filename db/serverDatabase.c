@@ -8,7 +8,6 @@
 #include "serverDatabase.h"
 #include "DatabaseMsgHandlers.h"
 #include "Config.h"
-#include <signal.h>
 
 
 static int exit_flag = 0;

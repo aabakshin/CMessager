@@ -9,7 +9,7 @@ enum
 /* Структура, представляющая элемент контейнера */
 struct CommandsHistoryList
 {
-	int number; 
+	int number;
 	char* command;
 	int command_size;
 	struct CommandsHistoryList* next;

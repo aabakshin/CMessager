@@ -5,6 +5,8 @@
 #include "serverConfigs.h"
 #include "DateTime.h"
 
+#include <stdio.h>
+#include <stdlib.h>
 
 char** parse_ops_file(int* strings_count)
 {
