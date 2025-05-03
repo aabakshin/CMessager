@@ -260,6 +260,7 @@ FILE* db_create_userinfo_table(int records_num, const char* table_name)
 		return NULL;
 	}
 
+
 	FILE* usr_fd;
 	if ( (usr_fd = fopen(table_name, "rb+")) == NULL )
 	{
@@ -270,39 +271,37 @@ FILE* db_create_userinfo_table(int records_num, const char* table_name)
 			return NULL;
 		}
 	}
-	else
+
+	int read_size = db_userinfo_table_get_size(usr_fd);
+	if ( read_size < 0 )
 	{
-		int read_size = db_userinfo_table_get_size(usr_fd);
-		if ( read_size < 0 )
-		{
-			return NULL;
-		}
-
-		if ( read_size >= records_num )
-		{
-			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" table \"%s\" is already initialized!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
-			return usr_fd;
-		}
-
-		fclose(usr_fd);
-		if ( (usr_fd = fopen(table_name, "ab+")) == NULL )
-		{
-			fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
-			return 0;
-		}
-
-		records_num -= read_size;
+		return NULL;
 	}
+
+	if ( read_size >= records_num )
+	{
+		fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" table \"%s\" is already initialized!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
+		return usr_fd;
+	}
+
+	fclose(usr_fd);
+	if ( (usr_fd = fopen(table_name, "ab+")) == NULL )
+	{
+		fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+		return NULL;
+	}
+
 
 	DBUsersInformation* new_record = malloc( sizeof(DBUsersInformation) );
 	if ( !new_record )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" memory error\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
+		return NULL;
 	}
 
-	int i;
-	for ( i = 1; i <= records_num; i++ )
+	int new_records_count = records_num - read_size;
+
+	for ( int i = 1; i <= new_records_count; i++ )
 	{
 		memset(new_record, 0, sizeof(DBUsersInformation));
 
@@ -480,6 +479,7 @@ FILE* db_create_usersessions_table(int records_num, const char* table_name)
 		return NULL;
 	}
 
+
 	FILE* sess_fd;
 	if ( (sess_fd = fopen(table_name, "rb+")) == NULL )
 	{
@@ -490,30 +490,25 @@ FILE* db_create_usersessions_table(int records_num, const char* table_name)
 			return NULL;
 		}
 	}
-	else
+
+
+	int read_size = db_usersessions_table_get_size(sess_fd);
+	if ( read_size < 0 )
 	{
-		int read_size = db_usersessions_table_get_size(sess_fd);
-		if ( read_size < 0 )
-		{
-			return NULL;
-		}
+		return NULL;
+	}
 
-		if ( read_size == records_num )
-		{
-			fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" table \"%s\" is already initialized!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
-			return sess_fd;
-		}
+	if ( read_size == records_num )
+	{
+		fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" table \"%s\" is already initialized!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), INFO_MESSAGE_TYPE, table_name);
+		return sess_fd;
+	}
 
-		fclose(sess_fd);
-		if ( (sess_fd = fopen(table_name, "ab+")) == NULL )
-		{
-			fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
-			return NULL;
-		}
-
-		if ( read_size > 0 )
-			if ( records_num > read_size )
-				records_num -= read_size;
+	fclose(sess_fd);
+	if ( (sess_fd = fopen(table_name, "ab+")) == NULL )
+	{
+		fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" you don't have permission to create file in this directory.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+		return NULL;
 	}
 
 
@@ -524,8 +519,10 @@ FILE* db_create_usersessions_table(int records_num, const char* table_name)
 		return NULL;
 	}
 
-	int i;
-	for ( i = 1; i <= records_num; i++ )
+	int new_records_count = records_num - read_size;
+
+
+	for ( int i = 1; i <= new_records_count; i++ )
 	{
 		memset(new_record, 0, sizeof(DBXUsersInformation));
 
@@ -642,82 +639,14 @@ char* db_readline_from_tables(FILE* usr_fd, FILE* sess_fd, const char* search_ke
 		return NULL;
 	}
 	memset(record, 0, sizeof(DBUsersInformation));
-
 	fseek(usr_fd, index * sizeof(DBUsersInformation), SEEK_SET);
 	fread(record, sizeof(DBUsersInformation), 1, usr_fd);
-
-	char buffer[100] = { 0 };
-	itoa(record->ID, buffer, 99);
-
-
-	char* result = malloc(sizeof(char) * BUFFER_SIZE);
-	if ( !result )
-	{
-		free(record);
-		fprintf(stderr, "[%s] %s In function \"db_readline_from_tables\" memory error with \"result\"!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
-		return NULL;
-	}
-
-	int pos = strlen(buffer);
-	memcpy(result, buffer, pos);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-	memset(buffer, 0, sizeof(buffer));
-
-	pos += strlen(record->username);
-	strcat(result, record->username);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-
-	pos += strlen(record->pass);
-	strcat(result, record->pass);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-
-	pos += strlen(record->rank);
-	strcat(result, record->rank);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-
-	pos += strlen(record->realname);
-	strcat(result, record->realname);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-
-	itoa(record->age, buffer, 99);
-	pos += strlen(buffer);
-	strcat(result, buffer);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-	memset(buffer, 0, sizeof(buffer));
-
-
-	pos += strlen(record->quote);
-	strcat(result, record->quote);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-	if ( record )
-		free(record);
 
 
 	DBXUsersInformation* xrecord = malloc( sizeof(DBXUsersInformation) );
 	if ( !xrecord )
 	{
-		free(result);
+		free(record);
 		fprintf(stderr, "[%s] %s In function \"db_readline_from_tables\" memory error with \"xrecord\"\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return NULL;
 	}
@@ -726,76 +655,58 @@ char* db_readline_from_tables(FILE* usr_fd, FILE* sess_fd, const char* search_ke
 	fread(xrecord, sizeof(DBXUsersInformation), 1, sess_fd);
 
 
-	itoa(xrecord->muted, buffer, 99);
+	char* result = malloc(sizeof(char) * BUFFER_SIZE);
+	if ( !result )
+	{
+		free(record);
+		free(xrecord);
+		fprintf(stderr, "[%s] %s In function \"db_readline_from_tables\" memory error with \"result\"!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+		return NULL;
+	}
 
-	pos += strlen(buffer);
-	strcat(result, buffer);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
+	char id_buf[ID_SIZE];
+	itoa(record->ID, id_buf, ID_SIZE-1);
 
-	memset(buffer, 0, sizeof(buffer));
+	char age_buf[ID_SIZE];	/* ID_SIZE - не ошибка, так должно быть*/
+	itoa(record->age, age_buf, ID_SIZE-1);
 
+	char muted_buf[MUTED_SIZE];
+	itoa(xrecord->muted, muted_buf, 9);
 
-	itoa(xrecord->start_mute_time, buffer, 99);
+	char smt[START_MUTE_TIME_SIZE];
+	itoa(xrecord->start_mute_time, smt, START_MUTE_TIME_SIZE-1);
 
-	pos += strlen(buffer);
-	strcat(result, buffer);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
+	char mt[MUTE_TIME_SIZE];
+	itoa(xrecord->mute_time, mt, MUTE_TIME_SIZE-1);
 
-	memset(buffer, 0, sizeof(buffer));
+	char mtl[MUTE_TIME_LEFT_SIZE];
+	itoa(xrecord->mute_time_left, mtl, MUTE_TIME_LEFT_SIZE-1);
 
+	const char* strings[] =
+	{
+			id_buf,
+			record->username,
+			record->pass,
+			record->rank,
+			record->realname,
+			age_buf,
+			record->quote,
+			muted_buf,
+			smt,
+			mt,
+			mtl,
+			xrecord->last_ip,
+			xrecord->last_date_in,
+			xrecord->last_date_out,
+			xrecord->registration_date,
+			NULL
+	};
+	int result_len = concat_request_strings(result, BUFFER_SIZE, strings);
+	if ( result_len > 0 )
+		result[result_len-1] = '\0';
 
-	itoa(xrecord->mute_time, buffer, 99);
-
-	pos += strlen(buffer);
-	strcat(result, buffer);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-	memset(buffer, 0, sizeof(buffer));
-
-
-	itoa(xrecord->mute_time_left, buffer, 99);
-
-	pos += strlen(buffer);
-	strcat(result, buffer);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-	memset(buffer, 0, sizeof(buffer));
-
-
-	pos += strlen(xrecord->last_ip);
-	strcat(result, xrecord->last_ip);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-
-	pos += strlen(xrecord->last_date_in);
-	strcat(result, xrecord->last_date_in);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-
-	pos += strlen(xrecord->last_date_out);
-	strcat(result, xrecord->last_date_out);
-	result[pos] = '|';
-	pos++;
-	result[pos] = '\0';
-
-
-	pos += strlen(xrecord->registration_date);
-	strcat(result, xrecord->registration_date);
-	result[pos] = '\n';
-	pos++;
-	result[pos] = '\0';
+	if ( record )
+		free(record);
 
 	if ( xrecord )
 		free(xrecord);
@@ -845,7 +756,7 @@ int db_writeline_to_tables(FILE* usr_fd, FILE* sess_fd, char* writeline)
 	}
 
 	DBXUsersInformation* xrecord = malloc(sizeof(DBXUsersInformation));
-	if ( !record )
+	if ( !xrecord )
 	{
 		free(record);
 		fprintf(stderr, "[%s] %s In function \"db_writeline_to_tables\" an internal error has occured. Memory error in \"record\"!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);

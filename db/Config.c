@@ -21,24 +21,24 @@ static const char* config_params_values[CONFIG_STRINGS_NUM] =
 				CONFIG_SETTING_DEFAULT_USERSSESSIONS_DB_NAME_VALUE
 };
 
-static char** parse_configuration_file(int* strings_count);
+static char** parse_configuration_file(int* strings_count, FILE* cfg_fd);
 
 
-static char** parse_configuration_file(int* strings_count)
+static char** parse_configuration_file(int* strings_count, FILE* cfg_fd)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
 	*strings_count = 0;
 
 
 	/* пытаемся открыть конфиг-файл */
-	int f_closed = 0;
-	FILE* cfg_ptr = NULL;
-	if ( !(cfg_ptr = fopen(CONFIG_NAME, "r")) )
+	int unable_read = 0;
+	if ( !(cfg_fd = fopen(CONFIG_NAME, "r+")) )
 	{
+		unable_read = 1;
 		/* если файл не существовал, пытаемся его создать и приводим настройки к дефолтным значениям */
 		fprintf(stderr, "[%s] %s Unable to open file \"%s\". Creating new one..\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), WARN_MESSAGE_TYPE, CONFIG_NAME);
 
-		if ( !(cfg_ptr = fopen(CONFIG_NAME, "w")) )
+		if ( !(cfg_fd = fopen(CONFIG_NAME, "w+")) )
 		{
 			fprintf(stderr, "[%s] %s Unable to create \"%s\" file. Do you have permission to this?\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
 			return NULL;
@@ -62,44 +62,27 @@ static char** parse_configuration_file(int* strings_count)
 			strncat(cfg_setting, config_params_values[j], len);
 			cfg_setting[pos] = '\0';
 
-			fprintf(cfg_ptr, "%s\n", cfg_setting);
-
+			fprintf(cfg_fd, "%s\n", cfg_setting);
 			j++;
 		}
 
-		if ( cfg_ptr )
-			fclose(cfg_ptr);
-
-		f_closed = 1;
-
+		rewind(cfg_fd);
 		*strings_count = j;
 	}
 
-	if ( f_closed )
-	{
-		if ( !(cfg_ptr = fopen(CONFIG_NAME, "r")) )
-		{
-			fprintf(stderr, "[%s] %s Unable to open file \"%s\". Is it exist?\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
-			return NULL;
-		}
-	}
-	else
+	if ( !unable_read )
 	{
 		int ch;
-		while ( (ch = fgetc(cfg_ptr)) != EOF )
+		while ( (ch = fgetc(cfg_fd)) != EOF )
 			if ( ch == '\n' )
 				(*strings_count)++;
 
-		rewind(cfg_ptr);
+		rewind(cfg_fd);
 	}
 
 	if ( *strings_count != CONFIG_STRINGS_NUM )
 	{
 		fprintf(stderr, "[%s] %s Incorrect strings number in configuration file \"%s\"! Is it correctly edited?\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
-
-		if ( cfg_ptr )
-			fclose(cfg_ptr);
-
 		return NULL;
 	}
 
@@ -107,10 +90,6 @@ static char** parse_configuration_file(int* strings_count)
 	if ( !config_strings )
 	{
 		fprintf(stderr, "[%s] %s An error is occured while allocating memory for \"config_strings\"\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
-
-		if ( cfg_ptr )
-			fclose(cfg_ptr);
-
 		return NULL;
 	}
 
@@ -129,19 +108,17 @@ static char** parse_configuration_file(int* strings_count)
 				config_strings[j] = NULL;
 			}
 			free(config_strings);
-
-			if ( cfg_ptr )
-				fclose(cfg_ptr);
-
 			return NULL;
 		}
 	}
 
 	/* чтение содержимого конфиг-файла в массив строк */
 	i = 0;
-	while ( !feof(cfg_ptr) )
+	while ( 1 )
 	{
-		fgets(config_strings[i], CONFIG_STRING_SIZE, cfg_ptr);
+		fgets(config_strings[i], CONFIG_STRING_SIZE, cfg_fd);
+		if ( feof(cfg_fd) )
+			break;
 
 		int len = strlen(config_strings[i]);
 		config_strings[i][len-1] = '\0';
@@ -151,30 +128,31 @@ static char** parse_configuration_file(int* strings_count)
 			break;
 	}
 
-	if ( cfg_ptr )
-		fclose(cfg_ptr);
+	rewind(cfg_fd);
 
 	return config_strings;
 }
 
-int read_configuration_file(ConfigFields* cfg)
+FILE* read_configuration_file(ConfigFields* cfg)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
 	if ( cfg == NULL )
 	{
 		fprintf(stderr, "[%s] %s Unable to parse configuration file. \"cfg\" is NULL!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
+		return NULL;
 	}
 
 	printf("[%s] %s Parsing configuration file...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	int strings_count = 0;
-	char** config_strings = parse_configuration_file(&strings_count);
+
+	FILE* cfg_fd = NULL;
+	char** config_strings = parse_configuration_file(&strings_count, cfg_fd);
 
 	if ( (config_strings == NULL) || (strings_count == 0) )
 	{
 		fprintf(stderr, "[%s] %s Unable to parse configuration file. Return value is null!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-		return 0;
+		return NULL;
 	}
 
 	char parsed_options[CONFIG_STRINGS_NUM][2][CONFIG_STRING_SIZE/2];
@@ -203,19 +181,19 @@ int read_configuration_file(ConfigFields* cfg)
 	if ( strcmp(parsed_options[0][0], CONFIG_SETTING_DEFAULT_DB_SIZE_NAME) != 0 )
 	{
 		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[0][0]);
-		return 0;
+		return NULL;
 	}
 
 	if ( strcmp(parsed_options[1][0], CONFIG_SETTING_DEFAULT_USERSDATA_DB_NAME) != 0 )
 	{
 		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[1][0]);
-		return 0;
+		return NULL;
 	}
 
 	if ( strcmp(parsed_options[2][0], CONFIG_SETTING_DEFAULT_USERSSESSIONS_DB_NAME) != 0 )
 	{
 		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[2][0]);
-		return 0;
+		return NULL;
 	}
 
 
@@ -224,7 +202,7 @@ int read_configuration_file(ConfigFields* cfg)
 	if ( db_records_num < 1 )
 	{
 		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[0][1]);
-		return 0;
+		return NULL;
 	}
 	cfg->records_num = db_records_num;
 	/////////////////////////////////////////////
@@ -236,7 +214,7 @@ int read_configuration_file(ConfigFields* cfg)
 	if ( (strcmp(db_userinfo_filename, "undefined") == 0) || (db_userinfo_filename[0] == '\0') )
 	{
 		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[1][1]);
-		return 0;
+		return NULL;
 	}
 	strcpy(cfg->userinfo_filename, db_userinfo_filename);
 	/////////////////////////////////////////////
@@ -248,17 +226,17 @@ int read_configuration_file(ConfigFields* cfg)
 	if ( (strcmp(db_userinfo_filename, "undefined") == 0) || (db_userinfo_filename[0] == '\0') )
 	{
 		fprintf(stderr, "[%s] %s Incorrect value in \"%s\" parameter!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, parsed_options[2][1]);
-		return 0;
+		return NULL;
 	}
 	strcpy(cfg->usersessions_filename, db_usersessions_filename);
 	/////////////////////////////////////////////
 
 	printf("[%s] %s Done!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 
-	return 1;
+	return cfg_fd;
 }
 
-int write_configuration_file(const ConfigFields* cfg)
+int write_configuration_file(const ConfigFields* cfg, FILE* cfg_fd)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -278,16 +256,19 @@ int write_configuration_file(const ConfigFields* cfg)
 			(char*)cfg->usersessions_filename
 	};
 
-	FILE* cfgPtr = NULL;
-	if ( !(cfgPtr = fopen(CONFIG_NAME, "r+")) )
+	if ( cfg_fd == NULL )
 	{
-		fprintf(stderr, "[%s] %s Unable to open \"%s\" config file. Trying to create one for you.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
-		if ( !(cfgPtr = fopen(CONFIG_NAME, "w")) )
+		if ( !(cfg_fd = fopen(CONFIG_NAME, "r+")) )
 		{
-			fprintf(stderr, "[%s] %s You don't have permission to create file in this directory.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-			return 0;
+			fprintf(stderr, "[%s] %s Unable to open \"%s\" config file. Trying to create one for you.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
+			if ( !(cfg_fd = fopen(CONFIG_NAME, "w+")) )
+			{
+				fprintf(stderr, "[%s] %s You don't have permission to create file in this directory.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+				return 0;
+			}
 		}
 	}
+	rewind(cfg_fd);
 
 	int i = 0;
 	while ( i < CONFIG_STRINGS_NUM )
@@ -306,12 +287,11 @@ int write_configuration_file(const ConfigFields* cfg)
 		pos += strlen(values[i]);
 		buffer[pos] = '\0';
 
-		fprintf(cfgPtr, "%s\n", buffer);
-
+		fprintf(cfg_fd, "%s\n", buffer);
 		i++;
 	}
 
-	fclose(cfgPtr);
+	rewind(cfg_fd);
 
 	return 1;
 }

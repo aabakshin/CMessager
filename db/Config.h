@@ -12,6 +12,8 @@
 #define CONFIG_SETTING_DEFAULT_USERSSESSIONS_DB_NAME		"defaultUsersSessionsDbName"
 #define CONFIG_SETTING_DEFAULT_USERSSESSIONS_DB_NAME_VALUE	"users_sessions.dat"
 
+#include <stdio.h>
+
 enum
 {
 	CONFIG_STRINGS_NUM							=			 3,
@@ -26,7 +28,7 @@ struct ConfigFields {
 typedef struct ConfigFields ConfigFields;
 
 
-int read_configuration_file(ConfigFields* cfg);
-int write_configuration_file(const ConfigFields* cfg);
+FILE* read_configuration_file(ConfigFields* cfg);
+int write_configuration_file(const ConfigFields* cfg, FILE* cfg_fd);
 
 #endif

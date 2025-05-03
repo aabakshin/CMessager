@@ -7,7 +7,6 @@
 #include "SessionList.h"
 #include "serverDatabase.h"
 #include "DatabaseMsgHandlers.h"
-#include "Config.h"
 
 
 static int exit_flag = 0;
@@ -17,9 +16,7 @@ enum
 {
 		QUEUE_SOCK_LEN					=			 16,
 		MAX_TOKENS_IN_MESSAGE			=			100,
-		WRITE_LINE_TOKENS				=			 15,
-		MSG_SYN_TIMER_MS				=			200,
-		MSG_SYN_TRIES_CNT				=			  3
+		WRITE_LINE_TOKENS				=			 15
 };
 
 /* DATABASE COMMANDS */
@@ -38,6 +35,7 @@ const char* db_commands_names[] =
 			NULL
 };
 
+
 static int db_session_do_read(Server* serv_ptr, Session* sess);
 static void db_session_check_lf(Server* serv_ptr, Session* sess);
 static void db_session_message_handler(Server* serv_ptr, Session* sess, const char* client_line);
@@ -45,7 +43,6 @@ static Session* db_get_session_by_fd(Server* serv_ptr, int fd);
 static int db_server_accept_client(Server* serv_ptr);
 static void db_server_close_session(Server* serv_ptr, int sock);
 static void db_server_force_stop(Server* serv_ptr);
-
 
 
 void stop_handler(int signo)
@@ -259,16 +256,14 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 			return;
 		}
 
-		msg_to_send = "DB_LINE_EXIST|";
-		char send_buf[BUFFER_SIZE] = { 0 };
-		len = strlen(msg_to_send);
-		memcpy(send_buf, msg_to_send, len);
-		send_buf[len] = '\0';
-
-		int len_readline = strlen(readline);
-		strncat(send_buf, readline, len_readline);
-		len += len_readline;
-		send_buf[len] = '\0';
+		const char* strings[] =
+		{
+					"DB_LINE_EXIST",
+					readline,
+					NULL
+		};
+		char send_buf[BUFFER_SIZE];
+		len = concat_request_strings(send_buf, BUFFER_SIZE, strings);
 
 		int wc = write(sess->data->fd, send_buf, len);
 		printf("[%s] %s Sent %d\\%d bytes to %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, sess->data->addr);
@@ -296,18 +291,26 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 				fclose(serv_ptr->server_data->user_table_fd);
 				fclose(serv_ptr->server_data->sess_table_fd);
 
-				FILE* usr_fd = db_create_userinfo_table(serv_ptr->server_data->db_records_num * 2, serv_ptr->server_data->user_table_name);
-				FILE* sess_fd = db_create_usersessions_table(serv_ptr->server_data->db_records_num * 2, serv_ptr->server_data->sess_table_name);
+				int new_records_num = serv_ptr->server_data->cfg->records_num * 2;
+
+				FILE* usr_fd = db_create_userinfo_table(new_records_num, serv_ptr->server_data->cfg->userinfo_filename);
+				FILE* sess_fd = db_create_usersessions_table(new_records_num, serv_ptr->server_data->cfg->usersessions_filename);
+
+				int success_flag = 0;
 
 				if ( usr_fd && sess_fd )
 				{
 					serv_ptr->server_data->user_table_fd = usr_fd;
 					serv_ptr->server_data->sess_table_fd = sess_fd;
 
-					index = serv_ptr->server_data->db_records_num;
-					serv_ptr->server_data->db_records_num *= 2;
+					index = serv_ptr->server_data->cfg->records_num;
+					serv_ptr->server_data->cfg->records_num = new_records_num;
+
+					if ( write_configuration_file(serv_ptr->server_data->cfg, serv_ptr->server_data->cfg_fd) )
+						success_flag = 1;
 				}
-				else
+
+				if ( !success_flag )
 				{
 					fprintf(stderr, "[%s] %s Unable to update size of database tables!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 
@@ -324,26 +327,23 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 			}
 		}
 
-		char write_line[BUFFER_SIZE] = { 0 };
-		int pos = 0;
-		char index_str[10];
-		itoa(index, index_str, 9);
-		int len = strlen(index_str);
-		memcpy(write_line + pos, index_str, len);
-		pos += len;
-		write_line[pos] = '|';
-		pos++;
 
-		int i;
-		for ( i = 1; i < WRITE_LINE_TOKENS; i++ )
-		{
-			len = strlen(mes_tokens[i]);
-			memcpy(write_line + pos, mes_tokens[i], len);
-			pos += len;
-			write_line[pos] = '|';
-			pos++;
-		}
-		write_line[pos-1] = '\0';
+		char* strings[WRITE_LINE_TOKENS+1];
+
+		char id_str[10];
+		itoa(index, id_str, 9);
+		strings[0] = id_str;
+
+		for ( int i = 1; i <= WRITE_LINE_TOKENS-1; i++ )
+			strings[i] = mes_tokens[i];
+
+		strings[WRITE_LINE_TOKENS] = NULL;
+
+		char write_line[BUFFER_SIZE];
+		int len = concat_request_strings(write_line, BUFFER_SIZE, (const char**) strings);
+		if ( len > 0 )
+			write_line[len-1] = '\0';
+
 
 		if ( db_writeline_to_tables(serv_ptr->server_data->user_table_fd, serv_ptr->server_data->sess_table_fd, write_line) )
 		{
@@ -361,23 +361,20 @@ static void db_session_message_handler(Server* serv_ptr, Session* sess, const ch
 	}
 	else if ( strcmp(mes_tokens[0], db_commands_names[DB_GET_RECORDS_NUM]) == 0 )
 	{
-		char send_buf[BUFFER_SIZE] = { 0 };
+		char send_buf[BUFFER_SIZE];
 
 		int non_empty_records = db_get_non_empty_records(serv_ptr->server_data->user_table_fd);
 		char buf[10];
 		itoa(non_empty_records, buf, 9);
 
-		const char* msg_to_send = "DB_RECORDS_NUM|";
-		int len = strlen(msg_to_send);
-
-		strcpy(send_buf, msg_to_send);
-		len += strlen(buf);
-		strcat(send_buf, buf);
-		send_buf[len] = '\n';
-		len++;
-		send_buf[len] = '\0';
-
-		int wc = write(sess->data->fd, msg_to_send, len);
+		const char* strings[] =
+		{
+					"DB_RECORDS_NUM",
+					buf,
+					NULL
+		};
+		int len = concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		int wc = write(sess->data->fd, send_buf, len);
 		printf("[%s] %s Sent %d\\%d bytes to %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, wc, len, sess->data->addr);
 	}
 	else
@@ -419,7 +416,7 @@ static Session* db_get_session_by_fd(Server* serv_ptr, int fd)
 	return NULL;
 }
 
-int db_server_init(int port, InitDbServData* server_data)
+int db_server_init(int port, InitDbServData* server_data, ConfigFields* cfg_values)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
@@ -455,28 +452,20 @@ int db_server_init(int port, InitDbServData* server_data)
 	}
 
 	printf("[%s] %s Reading configuration file...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
-	ConfigFields cfg_values;
-	memset(&cfg_values, 0, sizeof(ConfigFields));
-	if ( !read_configuration_file(&cfg_values) )
-	{
-		return -1;
-	}
-
 	FILE* cfg_fd = NULL;
-	if ( (cfg_fd = fopen(CONFIG_NAME, "r+")) == NULL )
+	if ( !(cfg_fd = read_configuration_file(cfg_values)) )
 	{
-		fprintf(stderr, "[%s] %s Unable to open file \"%s\"\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
 		return -1;
 	}
 
 	FILE* usr_fd = NULL;
-	if ( !(usr_fd = db_create_userinfo_table(cfg_values.records_num, cfg_values.userinfo_filename)) )
+	if ( !(usr_fd = db_create_userinfo_table(cfg_values->records_num, cfg_values->userinfo_filename)) )
 	{
 		return -1;
 	}
 
 	FILE* sess_fd = NULL;
-	if ( !(sess_fd = db_create_usersessions_table(cfg_values.records_num, cfg_values.usersessions_filename)) )
+	if ( !(sess_fd = db_create_usersessions_table(cfg_values->records_num, cfg_values->usersessions_filename)) )
 	{
 		return -1;
 	}
@@ -485,9 +474,7 @@ int db_server_init(int port, InitDbServData* server_data)
 	server_data->cfg_fd = cfg_fd;
 	server_data->user_table_fd = usr_fd;
 	server_data->sess_table_fd = sess_fd;
-	server_data->db_records_num = cfg_values.records_num;
-	strcpy(server_data->user_table_name, cfg_values.userinfo_filename);
-	strcpy(server_data->sess_table_name, cfg_values.usersessions_filename);
+	server_data->cfg = cfg_values;
 
 	printf("[%s] %s Initialization SUCCEED!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	printf("[%s] %s Waiting for connections..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);

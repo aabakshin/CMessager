@@ -1,3 +1,4 @@
+#include "Config.h"
 #include "serverDatabase.h"
 #include "../Commons.h"
 #include "../DateTime.h"
@@ -23,7 +24,10 @@ int main(int argc, char** argv)
 	InitDbServData srv_data;
 	memset(&srv_data, 0, sizeof(InitDbServData));
 
-	if ( db_server_init(port_number, &srv_data) == -1 )
+	ConfigFields cfg;
+	memset(&cfg, 0, sizeof(ConfigFields));
+
+	if ( db_server_init(port_number, &srv_data, &cfg) == -1 )
 	{
 		fprintf(stderr, "[%s] %s Unable to initialize server\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return 3;

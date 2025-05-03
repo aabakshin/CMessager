@@ -1,6 +1,7 @@
 #ifndef SERVERCOMMANDS_C_SENTRY
 #define SERVERCOMMANDS_C_SENTRY
 
+
 #include "DatabaseStructures.h"
 #include "StringList.h"
 #include "Commons.h"
@@ -1048,9 +1049,6 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		return;
 	}
 
-	const char* success = "*STATUS_COMMAND_SUCCESS|";
-	char buffer_message[BUFSIZE] = { 0 };
-	char buffer_status[100];
 	char cur_time[CURRENT_TIME_SIZE];
 
 	if ( args_num > 2 )
@@ -1064,47 +1062,48 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		return;
 	}
 
-	const char* user_status_ptr = get_status_str(sess->user_status);
 
-	int len = strlen(success);
-	int pos = len;
-	memcpy(buffer_message, success, len+1);
+	const char* cur_user_status = get_status_str(sess->user_status);
+	int strings_size = VALID_STATUSES_NUM + 2;
+	char* strings[strings_size];
 
+	strings[0] = "*STATUS_COMMAND_SUCCESS";
+	int j;
+	for ( j = 1; j < strings_size; j++ )
+		strings[j] = NULL;
+	j = 1;
+
+
+	char buffer_message[BUFSIZE];
 	if ( args_num == 2 )
 	{
-		memcpy(buffer_status, cmd_args[1], strlen(cmd_args[1])+1);
+		char status_arg[100];
+		memcpy(status_arg, cmd_args[1], strlen(cmd_args[1])+1);
 
-		if ( strcmp(user_status_ptr, buffer_status) == 0 )
+		if ( strcmp(cur_user_status, status_arg) == 0 )
 		{
 			session_send_string(sess, "*STATUS_COMMAND_ALREADY_SET\n");
 			return;
 		}
 
-		if ( strcmp(buffer_status, "list") == 0 )
+		if ( strcmp(status_arg, "list") == 0 )
 		{
 			int i;
 			for ( i = 1; i <= VALID_STATUSES_NUM; i++ )
 			{
 				const char* stat_ptr = get_status_str(i);
-				len = strlen(stat_ptr);
-				pos += len;
-				strncat(buffer_message, stat_ptr, len);
-				buffer_message[pos] = '|';
-				pos++;
+				strings[j] = (char*) stat_ptr;
+				j++;
 			}
 
 			if ( sess->rank == ADMIN_RANK_VALUE )
 			{
 				const char* stat_ptr = get_status_str(SECRET_NUMBER);
-				len = strlen(stat_ptr);
-				pos += len;
-				strncat(buffer_message, stat_ptr, len);
+				strings[j] = (char*) stat_ptr;
+				j++;
 			}
 
-			buffer_message[pos] = '\n';
-			pos++;
-			buffer_message[pos] = '\0';
-
+			concat_request_strings(buffer_message, BUFSIZE, (const char**) strings);
 			session_send_string(sess, buffer_message);
 		}
 		else
@@ -1114,7 +1113,7 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			{
 				const char* stat_str = get_status_str(i);
 
-				if ( strcmp(stat_str, buffer_status) == 0 )
+				if ( strcmp(stat_str, status_arg) == 0 )
 				{
 					sess->user_status = i;
 					session_send_string(sess, "*STATUS_COMMAND_SUCCESS\n");
@@ -1129,7 +1128,7 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 				{
 					const char* stat_str = get_status_str(SECRET_NUMBER);
 
-					if ( strcmp(stat_str, buffer_status) == 0 )
+					if ( strcmp(stat_str, status_arg) == 0 )
 					{
 						sess->user_status = SECRET_NUMBER;
 						session_send_string(sess, "*STATUS_COMMAND_SUCCESS\n");
@@ -1153,13 +1152,10 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		return;
 	}
 
-	len = strlen(user_status_ptr);
-	pos += len;
-	strncat(buffer_message, user_status_ptr, len);
-	buffer_message[pos] = '\n';
-	pos++;
-	buffer_message[pos] = '\0';
+	strings[j] = (char*) cur_user_status;
+	j++;
 
+	concat_request_strings(buffer_message, BUFSIZE, (const char**) strings);
 	session_send_string(sess, buffer_message);
 
 	if ( !clear_cmd_args(cmd_args, args_num) )
@@ -1577,18 +1573,17 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 	}
 
 
-	char success_string[BUFSIZE] = { 0 };
-	const char* success_code = "*RECORD_COMMAND_SUCCESS|";
+	char success_string[BUFSIZE];
+	int strings_size = DEBUG_RECORD_FIELDS_NUM + 2;
+	char* strings[strings_size];
 
-	int len = strlen(success_code);
-	int cur_pos = len;
-	strncat(success_string, success_code, len);
+	strings[0] = "*RECORD_COMMAND_SUCCESS";
+	strings[1] = (char*) type;
+	int j;
+	for ( j = 2; j < strings_size; j++ )
+		strings[j] = NULL;
+	j = 2;
 
-	len = strlen(type);
-	cur_pos += len;
-	strncat(success_string, type, len);
-	success_string[cur_pos] = '|';
-	cur_pos++;
 
 	if ( strcmp(type, "record") == 0 )
 	{
@@ -1614,22 +1609,15 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 		int i;
 		for ( i = 0; i < USER_RECORD_FIELDS_NUM+1; i++ )
 		{
-			len = strlen(args[i]);
-			cur_pos += len;
-			strncat(success_string, args[i], len);
-			success_string[cur_pos] = '|';
-			cur_pos++;
+			strings[j] = (char*) args[i];
+			j++;
 		}
-
-		success_string[cur_pos-1] = '\n';
-		success_string[cur_pos] = '\0';
-
 		free(response);
 	}
 	else if ( strcmp(type, "debug") == 0 )
 	{
-		ResponseDebugRecord* response = debug_show_record(sess, username, 0);
-		if ( !response )
+		ResponseDebugRecord* debug_response = debug_show_record(sess, username, 0);
+		if ( !debug_response )
 		{
 			sess->state = fsm_error;
 			return;
@@ -1638,41 +1626,35 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 		const char* args[] =
 		{
 				"20",
-				response->username,
-				response->id,
-				response->auth,
-				response->used,
-				response->last_date_in,
-				response->last_ip,
-				response->regdate,
-				response->username,
-				response->pass,
-				response->rank,
-				response->sock,
-				response->state,
-				response->status,
-				response->muted,
-				response->mute_time,
-				response->mute_time_left,
-				response->start_mute_time
+				debug_response->username,
+				debug_response->id,
+				debug_response->auth,
+				debug_response->used,
+				debug_response->last_date_in,
+				debug_response->last_ip,
+				debug_response->regdate,
+				debug_response->username,
+				debug_response->pass,
+				debug_response->rank,
+				debug_response->sock,
+				debug_response->state,
+				debug_response->status,
+				debug_response->muted,
+				debug_response->mute_time,
+				debug_response->mute_time_left,
+				debug_response->start_mute_time
 		};
 
 		int i;
 		for ( i = 0; i < DEBUG_RECORD_FIELDS_NUM+1; i++ )
 		{
-			len = strlen(args[i]);
-			cur_pos += len;
-			strncat(success_string, args[i], len);
-			success_string[cur_pos] = '|';
-			cur_pos++;
+			strings[j] = (char*) args[i];
+			j++;
 		}
-
-		success_string[cur_pos-1] = '\n';
-		success_string[cur_pos] = '\0';
-
-		free(response);
+		free(debug_response);
 	}
 
+	concat_request_strings(success_string, BUFSIZE, (const char**) strings);
 	session_send_string(sess, success_string);
 }
 
@@ -2109,54 +2091,37 @@ static void send_mute_response(ClientSession* sess, const char* username)
 		return;
 	}
 
-	const char* msg_to_victim = "*MUTE_COMMAND_YOU_MUTED|";
-	char response_to_victim[100];
-	int len = strlen(msg_to_victim);
-	int pos = len;
-	memcpy(response_to_victim, msg_to_victim, len+1);
 
-	int j;
-	for ( j = 0; j < server_ptr->sess_array_size; j++ )
-		if ( server_ptr->sess_array[j] )
-			if ( strcmp(server_ptr->sess_array[j]->login, username) == 0 )
+	int i;
+	for ( i = 0; i < server_ptr->sess_array_size; i++ )
+		if ( server_ptr->sess_array[i] )
+			if ( strcmp(server_ptr->sess_array[i]->login, username) == 0 )
 				break;
-	int index = j;
+	int index = i;
 
 
+	char response_to_victim[100];
 	char mt[MUTE_TIME_LEFT_SIZE];
 	itoa(server_ptr->sess_array[index]->mute_time_left, mt, MUTE_TIME_LEFT_SIZE-1);
-
-	int mt_len = strlen(mt);
-	pos += mt_len;
-	strncat(response_to_victim, mt, mt_len);
-	response_to_victim[pos] = '\n';
-	pos++;
-	response_to_victim[pos] = '\0';
-
+	const char* victim_strings[] =
+	{
+					"*MUTE_COMMAND_YOU_MUTED",
+					mt,
+					NULL
+	};
+	concat_request_strings(response_to_victim, 100, victim_strings);
 	session_send_string(server_ptr->sess_array[index], response_to_victim);
 
 
-	const char* mute_success = "*MUTE_COMMAND_SUCCESS|";
 	char response_sender[100];
-
-	len = strlen(mute_success);
-	pos = len;
-	memcpy(response_sender, mute_success, len+1);
-
-
-	len = strlen(username);
-	pos += len;
-	strncat(response_sender, username, len);
-	response_sender[pos] = '|';
-	pos++;
-	response_sender[pos] = '\0';
-
-	pos += mt_len;
-	strncat(response_sender, mt, mt_len);
-	response_sender[pos] = '\n';
-	pos++;
-	response_sender[pos] = '\0';
-
+	const char* sender_strings[] =
+	{
+					"*MUTE_COMMAND_SUCCESS",
+					username,
+					mt,
+					NULL
+	};
+	concat_request_strings(response_sender, 100, sender_strings);
 	session_send_string(sess, response_sender);
 }
 
@@ -2460,18 +2425,13 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	}
 
 	char buffer[100];
-	const char* unmute_success = "*UNMUTE_COMMAND_SUCCESS|";
-	int len = strlen(unmute_success);
-	int pos = len;
-	memcpy(buffer, unmute_success, len+1);
-
-	len = strlen(username_buf);
-	pos += len;
-	strncat(buffer, username_buf, len);
-	buffer[pos] = '\n';
-	pos++;
-	buffer[pos] = '\0';
-
+	const char* strings[] =
+	{
+				"*UNMUTE_COMMAND_SUCCESS",
+				username_buf,
+				NULL
+	};
+	concat_request_strings(buffer, 100, strings);
 	session_send_string(sess, buffer);
 }
 
@@ -2548,20 +2508,14 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		}
 	}
 
-	const char* str = "*KICK_COMMAND_SUCCESS|SENDER|";
 	char response[100];
-
-	int len = strlen(str);
-	int pos = len;
-	memcpy(response, str, len+1);
-
-	len = strlen(username_buf);
-	pos += len;
-	strncat(response, username_buf, len);
-	response[pos] = '\n';
-	pos++;
-	response[pos] = '\0';
-
+	const char* strings[] =
+	{
+				"*KICK_COMMAND_SUCCESS|SENDER",
+				username_buf,
+				NULL
+	};
+	concat_request_strings(response, 100, strings);
 	session_send_string(sess, response);
 }
 
@@ -2650,9 +2604,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	}
 
 
-	char response_buffer[BUFSIZE] = { 0 };
-	int pos = 0;
-
+	char response_buffer[BUFSIZE];
 	const char* args[] =
 	{
 			"*TABLE_COMMAND_SUCCESS",
@@ -2668,18 +2620,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 			last_ip,
 			NULL
 	};
-
-	for ( int j = 0; args[j] != NULL; j++ )
-	{
-		int len = strlen(args[j]);
-		pos += len;
-		strncat(response_buffer, args[j], len);
-		response_buffer[pos] = '|';
-		pos++;
-		response_buffer[pos] = '\0';
-	}
-
-	response_buffer[pos-1] = '\n';
+	concat_request_strings(response_buffer, BUFSIZE, args);
 	session_send_string(sess, response_buffer);
 }
 
