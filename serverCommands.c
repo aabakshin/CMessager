@@ -47,7 +47,7 @@ static void send_mute_response(ClientSession* sess, const char* username);
 
 extern Server* server_ptr;
 extern const char* server_codes_list[SERVER_CODES_COUNT];
-
+extern const char* subcommands_codes_list[SUBCOMMANDS_CODES_COUNT];
 
 int clear_cmd_args(char** cmd_args, int args_num)
 {
@@ -78,17 +78,17 @@ void command_overlimit_length_handler(ClientSession *sess)
 	if ( sess == NULL )
 		return;
 
-	char buf[100] = "*CMD_ARG_OVERLIMIT_LENGTH|";
+	char buf[100];
 	char max_length_arg_str[10];
 	itoa(CMD_ARGS_MAX_LENGTH, max_length_arg_str, 9);
 
-	int len = strlen(max_length_arg_str);
-	int pos = len;
-	strncat(buf, max_length_arg_str, len);
-	buf[pos] = '\n';
-	pos++;
-	buf[pos] = '\0';
-
+	const char* strings[] =
+	{
+			server_codes_list[CMD_ARG_OVERLIMIT_LENGTH_CODE],
+			max_length_arg_str,
+			NULL
+	};
+	concat_request_strings(buf, 100, strings);
 	session_send_string(sess, buf);
 }
 
@@ -143,7 +143,7 @@ void help_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	if ( args_num > 1 )
 	{
-		session_send_string(sess, "*COMMAND_PARAMS_NO_NEED\n");
+		session_send_string(sess, server_codes_list[COMMAND_PARAMS_NO_NEED_CODE]);
 		return;
 	}
 
@@ -178,7 +178,7 @@ void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	if ( args_num > 1 )
 	{
-		session_send_string(sess, "*COMMAND_PARAMS_NO_NEED\n");
+		session_send_string(sess, server_codes_list[COMMAND_PARAMS_NO_NEED_CODE]);
 		return;
 	}
 
@@ -186,7 +186,7 @@ void whoih_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	int strings_size = online_count+2;
 
 	char* strings[strings_size];
-	strings[0] = "*WHOIH_COMMAND_SUCCESS";
+	strings[0] = (char*) server_codes_list[WHOIH_COMMAND_SUCCESS_CODE];
 	int j;
 	for ( j = 1; j < strings_size; j++ )
 		strings[j] = NULL;
@@ -230,7 +230,17 @@ void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	if ( args_num != 2 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|CHGPWD|TOO_MUCH_ARGS\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"CHGPWD",
+					subcommands_codes_list[TOO_MUCH_ARGS],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
 			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"chgpass_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -275,7 +285,7 @@ void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 		const char* query_strings[] =
 		{
-						"DB_WRITELINE|",
+						"DB_WRITELINE",
 						sess->login,
 						sess->pass,
 						rank,
@@ -307,11 +317,11 @@ void chgpass_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			return;
 		}
 
-		session_send_string(sess, "*CHGPWD_COMMAND_SUCCESS\n");
+		session_send_string(sess, server_codes_list[CHGPWD_COMMAND_SUCCESS_CODE]);
 		return;
 	}
 
-	session_send_string(sess, "*CHGPWD_COMMAND_INCORRECT_PASS\n");
+	session_send_string(sess, server_codes_list[CHGPWD_COMMAND_INCORRECT_PASS_CODE]);
 }
 
 int eval_rank_num(const char* last_date_in, const char* registration_date)
@@ -404,7 +414,17 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	if ( args_num != 2 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|OP|TOO_MUCH_ARGS\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"OP",
+					subcommands_codes_list[TOO_MUCH_ARGS],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
 			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"op_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -434,7 +454,17 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	int index = atoi(id_param);
 	if ( index < 0 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|OP|USER_NOT_FOUND\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"OP",
+					subcommands_codes_list[USER_NOT_FOUND],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		return;
 	}
 
@@ -498,7 +528,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 			const char* query_strings[] =
 			{
-							"DB_WRITELINE|",
+							"DB_WRITELINE",
 							server_ptr->sess_array[i]->login,
 							"undefined",
 							rank,
@@ -532,7 +562,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		}
 		else
 		{
-			session_send_string(sess, "*OP_COMMAND_USER_ALREADY_ADMIN\n");
+			session_send_string(sess, server_codes_list[OP_COMMAND_USER_ALREADY_ADMIN_CODE]);
 			return;
 		}
 	}
@@ -550,7 +580,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 			rank[0] = 'A';
 			const char* query_strings[] =
 			{
-							"DB_WRITELINE|",
+							"DB_WRITELINE",
 							buffer_username,
 							"undefined",
 							rank,
@@ -584,7 +614,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		}
 		else
 		{
-			session_send_string(sess, "*OP_COMMAND_USER_ALREADY_ADMIN\n");
+			session_send_string(sess, server_codes_list[OP_COMMAND_USER_ALREADY_ADMIN_CODE]);
 			return;
 		}
 	}
@@ -596,11 +626,11 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	ops_strings = parse_ops_file(&strings_count);
 
 	FILE* dbops = NULL;
-	if ( !(dbops = fopen(OPS_NAME, "w")) )
+	if ( !(dbops = fopen(OPS_NAME, "w+")) )
 	{
 		fprintf(stderr, "[%s] %s You don't have permission to rewrite \"%s\" file\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, OPS_NAME);
 		sess->state = fsm_error;
-		session_send_string(sess, "*NO_PERM_TO_CREATE_FILE\n");
+		session_send_string(sess, server_codes_list[NO_PERM_TO_CREATE_FILE_CODE]);
 
 		int i;
 		for ( i = 0; i < strings_count; i++ )
@@ -646,7 +676,7 @@ void op_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	if ( ops_strings )
 		free(ops_strings);
 
-	session_send_string(sess, "*OP_COMMAND_SUCCESS\n");
+	session_send_string(sess, server_codes_list[OP_COMMAND_SUCCESS_CODE]);
 }
 
 void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
@@ -663,7 +693,17 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	if ( args_num != 2 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|DEOP|TOO_MUCH_ARGS\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"DEOP",
+					subcommands_codes_list[TOO_MUCH_ARGS],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
 			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"deop_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -690,11 +730,11 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	ops_strings = parse_ops_file(&strings_count);
 
 	FILE* dbops = NULL;
-	if ( !(dbops = fopen(OPS_NAME, "w")) )
+	if ( !(dbops = fopen(OPS_NAME, "w+")) )
 	{
 		fprintf(stderr, "[%s] %s You don't have permission to rewrite \"%s\" file\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, OPS_NAME);
 		sess->state = fsm_error;
-		session_send_string(sess, "*NO_PERM_TO_CREATE_FILE\n");
+		session_send_string(sess, server_codes_list[NO_PERM_TO_CREATE_FILE_CODE]);
 
 		int i;
 		for ( i = 0; i < strings_count; i++ )
@@ -715,7 +755,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		if ( dbops )
 			fclose(dbops);
 
-		session_send_string(sess, "*DEOP_COMMAND_USER_ALREADY_USER\n");
+		session_send_string(sess, server_codes_list[DEOP_COMMAND_USER_ADREADY_USER_CODE]);
 		return;
 	}
 
@@ -737,7 +777,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		if ( dbops )
 			fclose(dbops);
 
-		session_send_string(sess, "*DEOP_COMMAND_USER_ALREADY_USER\n");
+		session_send_string(sess, server_codes_list[DEOP_COMMAND_USER_ADREADY_USER_CODE]);
 		return;
 	}
 
@@ -785,7 +825,17 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	int index = atoi(id_param);
 	if ( index < 0 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|DEOP|USER_NOT_FOUND\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"DEOP",
+					subcommands_codes_list[USER_NOT_FOUND],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		return;
 	}
 
@@ -811,7 +861,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 		if ( server_ptr->sess_array[i]->rank != ADMIN_RANK_VALUE )
 		{
-			session_send_string(sess, "*DEOP_COMMAND_USER_ALREADY_USER\n");
+			session_send_string(sess, server_codes_list[DEOP_COMMAND_USER_ADREADY_USER_CODE]);
 			return;
 		}
 		else
@@ -854,7 +904,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 			const char* query_strings[] =
 			{
-							"DB_WRITELINE|",
+							"DB_WRITELINE",
 							server_ptr->sess_array[i]->login,
 							"undefined",
 							rank,
@@ -898,7 +948,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 		if ( rank[0] != 'A' )
 		{
-			session_send_string(sess, "*DEOP_COMMAND_USER_ALREADY_USER\n");
+			session_send_string(sess, server_codes_list[DEOP_COMMAND_USER_ADREADY_USER_CODE]);
 			return;
 		}
 		else
@@ -922,7 +972,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 			const char* query_strings[] =
 			{
-							"DB_WRITELINE|",
+							"DB_WRITELINE",
 							buffer_username,
 							"undefined",
 							rank,
@@ -956,7 +1006,7 @@ void deop_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 		}
 	}
 
-	session_send_string(sess, "*DEOP_COMMAND_SUCCESS\n");
+	session_send_string(sess, server_codes_list[DEOP_COMMAND_SUCCESS_CODE]);
 }
 
 void pm_command_handler(ClientSession *sess, char **cmd_args, int args_num)
@@ -976,7 +1026,17 @@ void pm_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	if ( args_num != 3 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|PM|TOO_MUCH_ARGS\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"PM",
+					subcommands_codes_list[TOO_MUCH_ARGS],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		if ( args_num > 0 )
 		{
 			if ( !clear_cmd_args(cmd_args, args_num) )
@@ -999,7 +1059,17 @@ void pm_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	if ( strcmp(buffer_username, sess->login) == 0 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|PM|SELF_USE\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"PM",
+					subcommands_codes_list[SELF_USE],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		return;
 	}
 
@@ -1016,7 +1086,18 @@ void pm_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	}
 
 	if ( user_offline )
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|PM|USER_OFFLINE\n");
+	{
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"PM",
+					subcommands_codes_list[USER_OFFLINE],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+	}
 }
 
 static const char* get_status_str(enum status user_status)
@@ -1053,7 +1134,17 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	if ( args_num > 2 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|STATUS|TOO_MUCH_ARGS\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"STATUS",
+					subcommands_codes_list[TOO_MUCH_ARGS],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
 			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"status_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -1067,7 +1158,7 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	int strings_size = VALID_STATUSES_NUM + 2;
 	char* strings[strings_size];
 
-	strings[0] = "*STATUS_COMMAND_SUCCESS";
+	strings[0] = (char*) server_codes_list[STATUS_COMMAND_SUCCESS_CODE];
 	int j;
 	for ( j = 1; j < strings_size; j++ )
 		strings[j] = NULL;
@@ -1082,7 +1173,7 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 		if ( strcmp(cur_user_status, status_arg) == 0 )
 		{
-			session_send_string(sess, "*STATUS_COMMAND_ALREADY_SET\n");
+			session_send_string(sess, server_codes_list[STATUS_COMMAND_ALREADY_SET_CODE]);
 			return;
 		}
 
@@ -1116,7 +1207,7 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 				if ( strcmp(stat_str, status_arg) == 0 )
 				{
 					sess->user_status = i;
-					session_send_string(sess, "*STATUS_COMMAND_SUCCESS\n");
+					session_send_string(sess, server_codes_list[STATUS_COMMAND_SUCCESS_CODE]);
 					break;
 				}
 			}
@@ -1131,14 +1222,14 @@ void status_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 					if ( strcmp(stat_str, status_arg) == 0 )
 					{
 						sess->user_status = SECRET_NUMBER;
-						session_send_string(sess, "*STATUS_COMMAND_SUCCESS\n");
+						session_send_string(sess, server_codes_list[STATUS_COMMAND_SUCCESS_CODE]);
 						flag = 1;
 					}
 				}
 
 				if ( !flag )
 				{
-					session_send_string(sess, "*STATUS_COMMAND_INCORRECT_STATUS\n");
+					session_send_string(sess, server_codes_list[STATUS_COMMAND_INCORRECT_STATUS_CODE]);
 				}
 			}
 		}
@@ -1195,7 +1286,7 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 	char response[BUFFER_SIZE];
 	const char* request[] =
 	{
-				"DB_READLINE|",
+				"DB_READLINE",
 				registered_username,
 				NULL
 	};
@@ -1215,7 +1306,18 @@ static ResponseRecord* user_show_record(ClientSession* sess, const char* registe
 			free(response_struct);
 
 		fprintf(stderr, "[%s] %s In function \"user_show_record\" unable to find record with \"%s\" name!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, registered_username);
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"RECORD",
+					subcommands_codes_list[USER_NOT_FOUND],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		return NULL;
 	}
 
@@ -1372,7 +1474,7 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 	char response[BUFFER_SIZE];
 	const char* request[] =
 	{
-				"DB_READLINE|",
+				"DB_READLINE",
 				registered_username,
 				NULL
 	};
@@ -1392,7 +1494,18 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 			free(response_struct);
 
 		fprintf(stderr, "[%s] %s In function \"debug_show_record\" unable to find record with \"%s\" name!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, registered_username);
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"RECORD",
+					subcommands_codes_list[USER_NOT_FOUND],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		return NULL;
 	}
 
@@ -1465,7 +1578,7 @@ static ResponseDebugRecord* debug_show_record(ClientSession* sess, const char* r
 
 					const char* query_strings[] =
 					{
-									"DB_WRITELINE|",
+									"DB_WRITELINE",
 									registered_username,
 									"undefined",
 									rank,
@@ -1577,7 +1690,7 @@ static void send_record_response(ClientSession* sess, const char* username, cons
 	int strings_size = DEBUG_RECORD_FIELDS_NUM + 2;
 	char* strings[strings_size];
 
-	strings[0] = "*RECORD_COMMAND_SUCCESS";
+	strings[0] = (char*) server_codes_list[RECORD_COMMAND_SUCCESS_CODE];
 	strings[1] = (char*) type;
 	int j;
 	for ( j = 2; j < strings_size; j++ )
@@ -1672,7 +1785,17 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	if ( args_num > 3 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|TOO_MUCH_ARGS\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"RECORD",
+					subcommands_codes_list[TOO_MUCH_ARGS],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
 			fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"record_command_handler\"[1]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
@@ -1712,7 +1835,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		char response[BUFFER_SIZE];
 		const char* request[] =
 		{
-					"DB_READLINE|",
+					"DB_READLINE",
 					buffer_param,
 					NULL
 		};
@@ -1726,7 +1849,17 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		if ( strcmp("DB_LINE_NOT_FOUND", response) == 0 )
 		{
 			fprintf(stderr, "[%s] %s In function \"record_command_handler\" unable to find record with \"%s\" name!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, buffer_param);
-			session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+			char send_buf[BUFFER_SIZE];
+			const char* strings[] =
+			{
+						server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+						"RECORD",
+						subcommands_codes_list[USER_NOT_FOUND],
+						NULL
+			};
+			concat_request_strings(send_buf, BUFFER_SIZE, strings);
+			session_send_string(sess, send_buf);
+
 			return;
 		}
 
@@ -1741,7 +1874,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		{
 			if ( sess->rank != ADMIN_RANK_VALUE )
 			{
-				session_send_string(sess, "*COMMAND_NO_PERMS\n");
+				session_send_string(sess, server_codes_list[COMMAND_NO_PERMS_CODE]);
 				return;
 			}
 		}
@@ -1760,14 +1893,14 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		{
 			if ( sess->rank != ADMIN_RANK_VALUE )
 			{
-				session_send_string(sess, "*COMMAND_NO_PERMS\n");
+				session_send_string(sess, server_codes_list[COMMAND_NO_PERMS_CODE]);
 			}
 			else
 			{
 				char response[BUFFER_SIZE];
 				const char* request[] =
 				{
-								"DB_READLINE|",
+								"DB_READLINE",
 								buffer_param_value,
 								NULL
 				};
@@ -1781,7 +1914,17 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 				if ( strcmp("DB_LINE_NOT_FOUND", response) == 0 )
 				{
 					fprintf(stderr, "[%s] %s In function \"record_command_handler\" unable to find record with \"%s\" name!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, buffer_param_value);
-					session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|USER_NOT_FOUND\n");
+					char send_buf[BUFFER_SIZE];
+					const char* strings[] =
+					{
+								server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+								"RECORD",
+								subcommands_codes_list[USER_NOT_FOUND],
+								NULL
+					};
+					concat_request_strings(send_buf, BUFFER_SIZE, strings);
+					session_send_string(sess, send_buf);
+
 					return;
 				}
 
@@ -1857,7 +2000,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 				const char* query_strings[] =
 				{
-								"DB_WRITELINE|",
+								"DB_WRITELINE",
 								sess->login,
 								"undefined",
 								rank,
@@ -1940,7 +2083,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 				const char* query_strings[] =
 				{
-								"DB_WRITELINE|",
+								"DB_WRITELINE",
 								sess->login,
 								"undefined",
 								rank,
@@ -2041,7 +2184,7 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 				const char* query_strings[] =
 				{
-								"DB_WRITELINE|",
+								"DB_WRITELINE",
 								sess->login,
 								"undefined",
 								rank,
@@ -2077,7 +2220,18 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		}
 
 		if ( !valid_param_flag )
-			session_send_string(sess, "*COMMAND_INVALID_PARAMS|RECORD|INCORRECT_STRING_VALUE\n");
+		{
+			char send_buf[BUFFER_SIZE];
+			const char* strings[] =
+			{
+						server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+						"RECORD",
+						subcommands_codes_list[INCORRECT_STRING_VALUE],
+						NULL
+			};
+			concat_request_strings(send_buf, BUFFER_SIZE, strings);
+			session_send_string(sess, send_buf);
+		}
 	}
 }
 
@@ -2105,7 +2259,7 @@ static void send_mute_response(ClientSession* sess, const char* username)
 	itoa(server_ptr->sess_array[index]->mute_time_left, mt, MUTE_TIME_LEFT_SIZE-1);
 	const char* victim_strings[] =
 	{
-					"*MUTE_COMMAND_YOU_MUTED",
+					server_codes_list[MUTE_COMMAND_YOU_MUTED_CODE],
 					mt,
 					NULL
 	};
@@ -2116,7 +2270,7 @@ static void send_mute_response(ClientSession* sess, const char* username)
 	char response_sender[100];
 	const char* sender_strings[] =
 	{
-					"*MUTE_COMMAND_SUCCESS",
+					server_codes_list[MUTE_COMMAND_SUCCESS_CODE],
 					username,
 					mt,
 					NULL
@@ -2158,7 +2312,17 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	if ( args_num != 3 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|TOO_MUCH_ARGS\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"MUTE",
+					subcommands_codes_list[TOO_MUCH_ARGS],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
@@ -2190,7 +2354,17 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		{
 			if ( strcmp(username_buf, sess->login) == 0 )
 			{
-				session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|SELF_USE\n");
+				char send_buf[BUFFER_SIZE];
+				const char* strings[] =
+				{
+							server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+							"MUTE",
+							subcommands_codes_list[SELF_USE],
+							NULL
+				};
+				concat_request_strings(send_buf, BUFFER_SIZE, strings);
+				session_send_string(sess, send_buf);
+
 				return;
 			}
 			else
@@ -2204,7 +2378,17 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	if ( !is_online )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|USER_OFFLINE\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"MUTE",
+					subcommands_codes_list[USER_OFFLINE],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		return;
 	}
 
@@ -2218,14 +2402,24 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	int is_muted = atoi(muted);
 	if ( is_muted )
 	{
-		session_send_string(sess, "*MUTE_COMMAND_USER_ALREADY_MUTED\n");
+		session_send_string(sess, server_codes_list[MUTE_COMMAND_USER_ALREADY_MUTED_CODE]);
 		return;
 	}
 
 	int mute_time = atoi(time_val);
 	if ( (mute_time < MIN_MUTE_TIME_SEC) || (mute_time > MAX_MUTE_TIME_SEC) )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|MUTE|INCORRECT_TIME_RANGE\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"MUTE",
+					subcommands_codes_list[INCORRECT_TIME_RANGE],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		return;
 	}
 
@@ -2260,7 +2454,7 @@ void mute_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 				const char* query_strings[] =
 				{
-								"DB_WRITELINE|",
+								"DB_WRITELINE",
 								username_buf,
 								"undefined",
 								rank,
@@ -2314,7 +2508,16 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	if ( args_num != 2 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|UNMUTE|TOO_MUCH_ARGS\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"UNMUTE",
+					subcommands_codes_list[TOO_MUCH_ARGS],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
 
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
@@ -2338,7 +2541,17 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 	if ( strcmp(sess->login, username_buf) == 0 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|UNMUTE|SELF_USE\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"UNMUTE",
+					subcommands_codes_list[SELF_USE],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		return;
 	}
 
@@ -2352,7 +2565,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	int is_muted = atoi(muted);
 	if ( !is_muted )
 	{
-		session_send_string(sess, "*UNMUTE_COMMAND_USER_NOT_MUTED\n");
+		session_send_string(sess, server_codes_list[UNMUTE_COMMAND_USER_NOT_MUTED_CODE]);
 		return;
 	}
 
@@ -2386,7 +2599,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 
 				const char* query_strings[] =
 				{
-								"DB_WRITELINE|",
+								"DB_WRITELINE",
 								username_buf,
 								"undefined",
 								rank,
@@ -2418,7 +2631,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 					return;
 				}
 
-				session_send_string(server_ptr->sess_array[i], "*UNMUTE_COMMAND_YOU_UNMUTED\n");
+				session_send_string(server_ptr->sess_array[i], server_codes_list[UNMUTE_COMMAND_YOU_UNMUTED_CODE]);
 				break;
 			}
 		}
@@ -2427,7 +2640,7 @@ void unmute_command_handler(ClientSession *sess, char **cmd_args, int args_num)
 	char buffer[100];
 	const char* strings[] =
 	{
-				"*UNMUTE_COMMAND_SUCCESS",
+				server_codes_list[UNMUTE_COMMAND_SUCCESS_CODE],
 				username_buf,
 				NULL
 	};
@@ -2449,7 +2662,16 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	if ( args_num != 2 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|KICK|TOO_MUCH_ARGS\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"KICK",
+					subcommands_codes_list[TOO_MUCH_ARGS],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
 
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
@@ -2476,7 +2698,17 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		{
 			if ( strcmp(username_buf, sess->login) == 0 )
 			{
-				session_send_string(sess, "*COMMAND_INVALID_PARAMS|KICK|SELF_USE\n");
+				char send_buf[BUFFER_SIZE];
+				const char* strings[] =
+				{
+							server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+							"KICK",
+							subcommands_codes_list[SELF_USE],
+							NULL
+				};
+				concat_request_strings(send_buf, BUFFER_SIZE, strings);
+				session_send_string(sess, send_buf);
+
 				return;
 			}
 			else
@@ -2490,7 +2722,17 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	if ( !is_online )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|KICK|USER_OFFLINE\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"KICK",
+					subcommands_codes_list[USER_OFFLINE],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
+
 		return;
 	}
 
@@ -2501,7 +2743,16 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		{
 			if ( strcmp(server_ptr->sess_array[i]->login, username_buf) == 0 )
 			{
-				session_send_string(server_ptr->sess_array[i], "*KICK_COMMAND_SUCCESS|VICTIM\n");
+				char send_buf[BUFFER_SIZE];
+				const char* strings[] =
+				{
+							server_codes_list[KICK_COMMAND_SUCCESS_CODE],
+							"VICTIM",
+							NULL
+				};
+				concat_request_strings(send_buf, BUFFER_SIZE, strings);
+				session_send_string(sess, send_buf);
+
 				int sock = server_ptr->sess_array[i]->sockfd;
 				server_close_session(sock, server_ptr);
 			}
@@ -2511,7 +2762,8 @@ void kick_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	char response[100];
 	const char* strings[] =
 	{
-				"*KICK_COMMAND_SUCCESS|SENDER",
+				server_codes_list[KICK_COMMAND_SUCCESS_CODE],
+				"SENDER",
 				username_buf,
 				NULL
 	};
@@ -2533,7 +2785,16 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 
 	if ( args_num != 2 )
 	{
-		session_send_string(sess, "*COMMAND_INVALID_PARAMS|TABLE|TOO_MUCH_ARGS\n");
+		char send_buf[BUFFER_SIZE];
+		const char* strings[] =
+		{
+					server_codes_list[COMMAND_INVALID_PARAMS_CODE],
+					"TABLE",
+					subcommands_codes_list[TOO_MUCH_ARGS],
+					NULL
+		};
+		concat_request_strings(send_buf, BUFFER_SIZE, strings);
+		session_send_string(sess, send_buf);
 
 		if ( !clear_cmd_args(cmd_args, args_num) )
 		{
@@ -2607,7 +2868,7 @@ void table_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 	char response_buffer[BUFSIZE];
 	const char* args[] =
 	{
-			"*TABLE_COMMAND_SUCCESS",
+			server_codes_list[TABLE_COMMAND_SUCCESS_CODE],
 			"4",
 			id,
 			username,

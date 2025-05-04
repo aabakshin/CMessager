@@ -21,6 +21,8 @@ static void print_greeting_text_frame(const char** text_strings, int text_string
 static int send_answer(int peer_sock, const char** box_messages, int box_messages_size, int max_read_chars);
 static int view_record_success_result(char** response_tokens, int fields_num, int debug_mode);
 
+extern const char* server_codes_list[SERVER_CODES_COUNT];
+extern const char* subcommands_codes_list[SUBCOMMANDS_CODES_COUNT];
 
 char* get_code(void)
 {
@@ -58,7 +60,7 @@ int restrict_message_length(char* read)
 
 void delete_extra_spaces(char* read, int read_size)
 {
-	/* Удаляет пробела из начала сообщения */
+	/* Удаляет пробелов из начала сообщения */
 	///////////////////////////////////////////////////////////
 	int i = 0, c = 0;
 
@@ -69,6 +71,9 @@ void delete_extra_spaces(char* read, int read_size)
 		read[i-c] = read[i];
 	///////////////////////////////////////////////////////////
 
+
+	/* Удаление пробелов из середины сообщения */
+	///////////////////////////////////////////////////////////
 	char* message_tokens[MAX_TOKENS_NUM] = { NULL };
 	char* istr = strtok(read, " ");
 
@@ -91,7 +96,11 @@ void delete_extra_spaces(char* read, int read_size)
 		istr = strtok(NULL, " ");
 	}
 	int size = i;
+	///////////////////////////////////////////////////////////
 
+
+	/* Удаление пробелов с конца сообщения */
+	///////////////////////////////////////////////////////////
 	int k = 0;
 	int j;
 	for ( i = 0; i < size; i++ )
@@ -101,6 +110,7 @@ void delete_extra_spaces(char* read, int read_size)
 		read[k++] = ' ';
 	}
 	read[k-1] = '\0';
+	///////////////////////////////////////////////////////////
 }
 
 static void show_logo(void)
@@ -206,19 +216,22 @@ static int view_record_success_result(char** response_tokens, int fields_num, in
 	if ( !args )
 		return 0;
 
-	int i, j, k;
-	for ( i = 0, j = 3; i < fields_num; i++, j++ )
+	for ( int i = 0, j = 3; i < fields_num; i++, j++ )
 	{
 		args[i] = malloc(sizeof(char) * strlen(response_tokens[j]) + 1 );
 		if ( !(args[i]) )
 		{
-			int m;
-			for (m = 0; m < i; m++)
+			for ( int m = 0; m < i; m++ )
 				if ( args[m] )
 					free(args[m]);
+			
+			if ( args )
+				free(args);
+
 			return 0;
 		}
-
+		
+		int k;
 		for ( k = 0; response_tokens[j][k]; k++ )
 			args[i][k] = response_tokens[j][k];
 		args[i][k] = '\0';
@@ -226,7 +239,7 @@ static int view_record_success_result(char** response_tokens, int fields_num, in
 
 	print_record(args, fields_num, debug_mode);
 
-	for ( i = 0; i < fields_num; i++ )
+	for ( int i = 0; i < fields_num; i++ )
 		if ( args[i] )
 			free(args[i]);
 
@@ -277,9 +290,9 @@ int client_init(const char* address, const char* port)
 }
 
 /* Обработка полученной информации от сервера в соответствии с протоколом общения */
-int check_server_response(int peer_sock, char **response_tokens, int response_tokens_size, int* authorized)
+int check_server_response(int peer_sock, char** response_tokens, int response_tokens_size, int* authorized)
 {
-	if ( strcmp(response_tokens[0], "*CLIENT_HAS_ACCOUNT") == 0 )
+	if ( strcmp(response_tokens[0], server_codes_list[CLIENT_HAS_ACCOUNT_CODE] ) == 0 )
 	{
 		int max_read_chars = HAS_ACCOUNT_VALUE_LENGTH;
 		const char* box_messages[] = { "Have you already have an account?", "Enter \"y\"or\"n\"", NULL };
@@ -289,11 +302,11 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return 0;
+			return -1;
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*LOGIN_WAIT_LOGIN") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[LOGIN_WAIT_LOGIN_CODE]) == 0 )
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
 		const char* box_messages[] = { "Enter nickname for your account", NULL };
@@ -303,11 +316,11 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return 0;
+			return -1;
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*LOGIN_ALREADY_AUTHORIZED") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[LOGIN_ALREADY_AUTHORIZED_CODE]) == 0 )
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
 		const char* box_messages[] = { "This account is already authorized", "Try to use another login", NULL };
@@ -317,11 +330,11 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return 0;
+			return -1;
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*LOGIN_ALREADY_USED") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[LOGIN_ALREADY_USED_CODE]) == 0 )
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
 		const char* box_messages[] = { "This login is already exist in database", "Try another one",  NULL };
@@ -331,11 +344,11 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return 0;
+			return -1;
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*LOGIN_INCORRECT") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[LOGIN_INCORRECT_CODE]) == 0 )
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
 		const char* box_messages[] = { "Incorrect login!", "Please, check it and try again", NULL };
@@ -345,11 +358,11 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return 0;
+			return -1;
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*LOGIN_NOT_EXIST") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[LOGIN_NOT_EXIST_CODE]) == 0 )
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
 		const char* box_messages[] = { "This login doesn't exist", "Check your input string", NULL };
@@ -359,11 +372,11 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return 0;
+			return -1;
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*SIGNUP_WAIT_LOGIN") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[SIGNUP_WAIT_LOGIN_CODE]) == 0 )
 	{
 		int max_read_chars = MAX_LOGIN_LENGTH;
 		const char* box_messages[] = { "Enter nickname to create", "new account", NULL };
@@ -373,110 +386,105 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return 0;
+			return -1;
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*LOGIN_WAIT_PASS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[LOGIN_WAIT_PASS_CODE]) == 0 )
 	{
 		int max_read_chars = MAX_PASS_LENGTH;
-		const char* box_messages[] = {"Enter password for your account", NULL};
-		
+		const char* box_messages[] = { "Enter password for your account", NULL };
+
 		int box_messages_size = 0;
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return 0;
+			return -1;
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*NEW_PASS_INCORRECT") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[NEW_PASS_INCORRECT_CODE]) == 0 )
 	{
 		int max_read_chars = MAX_PASS_LENGTH;
-		const char* box_messages[] = {"Password incorrect!", "Check it and try again", NULL};
-		
+		const char* box_messages[] = { "Password incorrect!", "Check it and try again", NULL };
+
 		int box_messages_size = 0;
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return 0;
+			return -1;
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*PASS_NOT_MATCH") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[PASS_NOT_MATCH_CODE]) == 0 )
 	{
 		int max_read_chars = MAX_PASS_LENGTH;
-		const char* box_messages[] = {"Password doesn't match with this account", "Try again", NULL};
-		
+		const char* box_messages[] = { "Password doesn't match with this account", "Try again", NULL };
+
 		int box_messages_size = 0;
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return 0;
+			return -1;
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*SIGNUP_WAIT_PASS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[SIGNUP_WAIT_PASS_CODE]) == 0 )
 	{
 		int max_read_chars = MAX_PASS_LENGTH;
-		const char* box_messages[] = {"Enter pass for your new account", NULL};
-		
+		const char* box_messages[] = { "Enter pass for your new account", NULL };
+
 		int box_messages_size = 0;
 		while ( box_messages[box_messages_size] )
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return 0;
+			return -1;
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*USER_AUTHORIZED") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[USER_AUTHORIZED_CODE]) == 0 )
 	{
-		putchar('\n');
-		int i;
-		for ( i = 1; i <= 28; i++ )
-			putchar(' ');
+		printf("%s", "\n                            ");
 		printf("\"%s\" joined to GLOBAL chat\n", response_tokens[1]);
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*USER_LEFT_CHAT") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[USER_LEFT_CHAT_CODE]) == 0 )
 	{
-		putchar('\n');
-		int i;
-		for ( i = 1; i <= 28; i++ )
-			printf("%c", ' ');
+		printf("%s", "\n                            ");
 		printf("\"%s\" left GLOBAL chat\n", response_tokens[1]);
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*CANNOT_CONNECT_DATABASE") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[CANNOT_CONNECT_DATABASE_CODE]) == 0 )
 	{
-		printf("\033c");
-		fprintf(stderr, "Server cannot connect to database file. Try later\n");
+		printf("%s", "\033c");
+		printf("%s", "\n                            ");
+		printf("%s", "Server cannot connect to database server. Try later\n");
+
+		return -1;
+	}
+	else if ( strcmp(response_tokens[0], server_codes_list[CMD_ARG_OVERLIMIT_LENGTH_CODE]) == 0 )
+	{
+		printf("%s", "\n                            ");
+		printf("Some command or argument in your input is too long! Max length is %s\n", response_tokens[1]);
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*CMD_ARG_OVERLIMIT_LENGTH") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[HELP_COMMAND_SUCCESS_CODE]) == 0 )
 	{
-		fprintf(stderr, "Some command or argument in your input is too long! Max length is %s\n", response_tokens[1]);
-
-		return 1;
-	}
-	else if ( strcmp(response_tokens[0], "*HELP_COMMAND_SUCCESS") == 0 )
-	{
-		printf("%s\n", "--- List of all valid commands ---");
-		int k;
-		for ( k = 1; k < response_tokens_size; k++ )
+		printf("%s", "--- List of all valid commands ---\n");
+		for ( int k = 1; k < response_tokens_size; k++ )
 			printf("[%d]: %s\n", k, response_tokens[k]);
-		printf("%s\n", "----------------------------------");
+		printf("%s", "----------------------------------\n");
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*WHOIH_COMMAND_SUCCESS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[WHOIH_COMMAND_SUCCESS_CODE]) == 0 )
 	{
 		int users_counter = response_tokens_size-1;
 
@@ -484,9 +492,8 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 		{
 			printf("%s", "There ");
 			(users_counter > 1) ? printf("are %d users online:\n", users_counter) : printf("is %d user online:\n", users_counter);
-			
-			int i;
-			for ( i = 1; i <= users_counter; i++ )
+
+			for ( int i = 1; i <= users_counter; i++ )
 				printf("%s\n", response_tokens[i]);
 			printf("%s\n", "------------------------");
 		}
@@ -495,292 +502,338 @@ int check_server_response(int peer_sock, char **response_tokens, int response_to
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*CHGPWD_COMMAND_SUCCESS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[CHGPWD_COMMAND_SUCCESS_CODE]) == 0 )
 	{
-		printf("%s\n", "Your password has been successfully changed");
-		return 1;
-	}
-	else if ( strcmp(response_tokens[0], "*CHGPWD_COMMAND_INCORRECT_PASS") == 0 )
-	{
-		printf("%s\n",
-			   "Incorrect password. Try to follow next rules:\n"
-			   "Password must be not less than 4 symbols\n"
-			   "Password must be not more than 20 symbols\n"
-			   "Password has to consist correct symbols(a-zA-Z0-9 and special chars)"
-			  );
+		printf("%s", "\n                            ");
+		printf("%s", "Your password has been successfully changed\n");
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*DEOP_COMMAND_SUCCESS") == 0 )
-	{
-		printf("%s\n", "User has been removed from Admin group");
+	else if ( strcmp(response_tokens[0], server_codes_list[CHGPWD_COMMAND_INCORRECT_PASS_CODE]) == 0 )
+	{	
+		printf("%s", "\n                            ");
+		printf("Incorrect password. Try to follow next rules:\n");
+		printf("%s", "\n                            ");
+		printf("Password must be not less than 4 symbols\n");
+		printf("%s", "\n                            ");
+		printf("Password must be not more than 20 symbols\n");
+		printf("%s", "\n                            ");
+		printf("Password has to consist correct symbols(a-zA-Z0-9 and special chars)\n");
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*DEOP_COMMAND_USER_ALREADY_USER") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[DEOP_COMMAND_SUCCESS_CODE]) == 0 )
 	{
-		printf("%s\n", "This user is not an administrator\n"
-				       "or has been removed from admin's group earlier");
+		printf("%s", "\n                            ");
+		printf("%s", "User has been removed from Admin group\n");
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*OP_COMMAND_SUCCESS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[DEOP_COMMAND_USER_ADREADY_USER_CODE]) == 0 )
 	{
-		printf("%s\n", "User has been added to Admin's group");
+		printf("%s", "\n                            ");
+		printf("%s", "This user is not an administrator\n"
+				"or has been removed from admin's group earlier\n");
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*OP_COMMAND_USER_ALREADY_ADMIN") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[OP_COMMAND_SUCCESS_CODE]) == 0 )
 	{
-		printf("%s\n", "User is already in Admin's group");
+		printf("%s", "\n                            ");
+		printf("%s", "User has been added to Admin's group\n");
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*STATUS_COMMAND_INCORRECT_STATUS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[OP_COMMAND_USER_ALREADY_ADMIN_CODE]) == 0 )
 	{
-		printf("%s\n", "Incorrect status! Type \"/status list\" to see list of valid statuses");
+		printf("%s", "\n                            ");
+		printf("%s", "User is already in Admin's group\n");
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*STATUS_COMMAND_ALREADY_SET") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[STATUS_COMMAND_INCORRECT_STATUS_CODE]) == 0 )
 	{
-		printf("%s\n", "You have already set this status!");
+		printf("%s", "\n                            ");
+		printf("%s", "Incorrect status! Type \"/status list\" to see list of valid statuses\n");
+		
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*STATUS_COMMAND_SUCCESS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[STATUS_COMMAND_ALREADY_SET_CODE]) == 0 )
+	{
+		printf("%s", "\n                            ");
+		printf("%s", "You have already set this status!\n");
+
+		return 1;
+	}
+	else if ( strcmp(response_tokens[0], server_codes_list[STATUS_COMMAND_SUCCESS_CODE]) == 0 )
 	{
 		if ( response_tokens_size == 1 )
-			printf("%s\n", "Your status has been successfully changed");
+		{
+			printf("%s", "\n                            ");
+			printf("%s", "Your status has been successfully changed.\n");
+		}
 		else if ( response_tokens_size == 2 )
+		{
+			printf("%s", "\n                            ");
 			printf("Your current status: %s\n", response_tokens[1]);
+		}
 		else if ( response_tokens_size > 2 )
 		{
-			printf("%s\n", "List of all valid statuses:");
-			int i;
-			for ( i = 1; i < response_tokens_size; i++ )
-				printf("- %s\n", response_tokens[i]);
-			printf("%s\n", "----------------------");
+			printf("%s", "List of all valid statuses:\n");
+			for ( int i = 1; i < response_tokens_size; i++ )
+			{
+				printf("- ");
+				printf("%s", response_tokens[i]);
+				printf("\n");
+			}
+			printf("%s", "----------------------\n");
 		}
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*RECORD_COMMAND_SUCCESS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[RECORD_COMMAND_SUCCESS_CODE]) == 0 )
 	{
+		char cur_time[CURRENT_TIME_SIZE];
+		
+		printf("%s", "\033c");
+		printf("%s", "\n                            ");
+		
 		if ( strcmp(response_tokens[1], "debug") == 0 )
 		{
 			if ( !view_record_success_result(response_tokens, DEBUG_RECORD_FIELDS_NUM, 1) )
-				printf("%s\n", "[ERROR]: An error has occured while allocating memory to string buffers!");
+			{
+				printf("[%s] %s: An error has occured while allocating memory to string buffers!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+				return -1;
+			}
 		}
 		else if ( strcmp(response_tokens[1], "record") == 0 )
 		{
 			if ( !view_record_success_result(response_tokens, USER_RECORD_FIELDS_NUM, 0) )
-				printf("%s\n", "[ERROR]: An error has occured while allocating memory to string buffers!");
+			{
+				printf("[%s] %s: An error has occured while allocating memory to string buffers!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+				return -1;
+			}
 		}
 
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*MUTE_COMMAND_USER_ALREADY_MUTED") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[MUTE_COMMAND_USER_ALREADY_MUTED_CODE]) == 0 )
 	{
+		printf("%s", "\n                            ");
 		printf("%s\n", "Unable to execute a command. User has already muted!");
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*MUTE_COMMAND_SUCCESS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[MUTE_COMMAND_SUCCESS_CODE]) == 0 )
 	{
+		printf("%s", "\n                            ");
 		printf("User \"%s\" has been muted for %s seconds.\n", response_tokens[1], response_tokens[2]);
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*MUTE_COMMAND_YOU_MUTED") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[MUTE_COMMAND_YOU_MUTED_CODE]) == 0 )
 	{
+		printf("%s", "\n                            ");
 		printf("You have been muted for %s seconds.\n", response_tokens[1]);
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*UNMUTE_COMMAND_USER_NOT_MUTED") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[UNMUTE_COMMAND_USER_NOT_MUTED_CODE]) == 0 )
 	{
-		printf("%s\n", "Unable to execute a command. User is already unmuted!");
+		printf("%s", "\n                            ");
+		printf("Unable to execute a command. User is already unmuted!\n");
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*UNMUTE_COMMAND_SUCCESS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[UNMUTE_COMMAND_SUCCESS_CODE]) == 0 )
 	{
+		printf("%s", "\n                            ");
 		printf("User \"%s\" has been successfully unmuted.\n", response_tokens[1]);
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*UNMUTE_COMMAND_YOU_UNMUTED") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[UNMUTE_COMMAND_YOU_UNMUTED_CODE]) == 0 )
 	{
-		printf("%s\n", "You have been unmuted.");
+		printf("%s", "\n                            ");
+		printf("%s", "You have been unmuted.\n");
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*KICK_COMMAND_SUCCESS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[KICK_COMMAND_SUCCESS_CODE]) == 0 )
 	{
 		if ( strcmp(response_tokens[1], "SENDER") == 0 )
 		{
+			printf("%s", "\n                            ");
 			printf("User \"%s\" has been kicked from the chat.\n", response_tokens[2]);
 		}
 		else if ( strcmp(response_tokens[1], "VICTIM") == 0 )
 		{
-			printf("\033c");
-			printf("%s\n", "You have been kicked from the chat.");
+			printf("%s", "\033c");
+			printf("%s", "\n                            ");
+			printf("%s", "You have been kicked from the chat.\n");
 		}
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*TABLE_COMMAND_SUCCESS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[TABLE_COMMAND_SUCCESS_CODE]) == 0 )
 	{
-		/*
-		int z;
-		printf("%s\n", "DEBUG----------------------------------------DEBUG");
-		for (z = 0; z < response_tokens_size; z++)
+		int fields_count1 = atoi(response_tokens[1]);
+		int fields_count2 = atoi(response_tokens[6]);
+		if ( (fields_count1 < 1) || (fields_count2 < 1) || (response_tokens_size < 11) )
 		{
-			printf("\t\t%s\n", response_tokens[z]);
-		}
-		printf("%s\n", "DEBUG----------------------------------------DEBUG");
-		*/
+			printf("%s", "\n                            ");
+			printf("%s", "Unable extract field from response string properly!\n");
 
-		if ( strcmp(response_tokens[1], "LIST") == 0 )
-		{
-			printf("%s\n", "List of available tables:");
-			int i;
-			for ( i = 2; i < response_tokens_size; i++ )
-				printf("[%d]: %s\n", i-1, response_tokens[i]);
-			printf("%s\n", "-------------------------");
-			return 1;
+			return -1;
 		}
+
+		int i = 2;
+		printf("------------------------------------------------------\n");
+		printf("| %-4s | %-16s | %-20s | %-1s |\n", "ID", "Username", "Password", "R");
+		printf("------------------------------------------------------\n");
+		printf("| %-4s | %-16s | %-20s | %-1s |\n", response_tokens[i], response_tokens[i+1], response_tokens[i+2], response_tokens[i+3]);
+		printf("------------------------------------------------------\n");
+		i += fields_count1;
+
+		printf("\n\n\n");
+
+		printf("------------------------------------------------------\n");
+		printf("| %-4s | %-25s | %-25s | %-25s | %-25s |\n", "ID", "Reg. Date", "Last In Date", "Last Out Date", "Last IP");
+		printf("------------------------------------------------------\n");
+		printf("| %-4s | %-25s | %-25s | %-25s | %-25s |\n", response_tokens[2], response_tokens[i+1], response_tokens[i+2], response_tokens[i+3], response_tokens[i+4]);
+		printf("------------------------------------------------------\n");
 		
-		if ( strcmp(response_tokens[1], "DATA") == 0 )
-		{
-			int non_empty_records_size = atoi(response_tokens[3]);
+		printf("\n\n\n");
 
-			if ( strcmp(response_tokens[4], "USERINFO") == 0 )
-			{
-				printf(
-					   "\n%s\n"
-					   "%s\n"
-					   "| %-4s | %-16s | %-20s | %-1s |\n"
-					   "%s\n",
-					   "File \"usersdata.dat\":",
-					   "------------------------------------------------------",
-					   "ID", "Username", "Password", "R",
-					   "------------------------------------------------------"
-					  );
-				
-				int i;
-				for ( i = 5; i < ( 5 * non_empty_records_size); i += 4 )
-				{
-					printf("| %-4s | %-16s | %-20s | %-1s |\n", response_tokens[i], response_tokens[i+1], response_tokens[i+2], response_tokens[i+3]);
-					printf("%s\n", "------------------------------------------------------");
-				}
-			}
-			else if ( strcmp(response_tokens[4], "XUSERINFO") == 0 )
-			{
-				printf(
-						"\n%s\n" 
-					    "%s\n"
-						"| %-4s | %-25s | %-25s | %-25s | %-25s |\n"
-						"%s\n",
-						"File \"users_sessions_info.dat\":",
-						"------------------------------------------------------------------------------------------------------------------------",
-						"ID", "Reg. Date", "Last In Date", "Last Out Date", "Last IP",
-						"------------------------------------------------------------------------------------------------------------------------"
-					  );
-				
-				int i;
-				for ( i = 5; i <= (5 * non_empty_records_size); i += 5 )
-				{
-					printf("| %-4s | %-25s | %-25s | %-25s | %-25s |\n", response_tokens[i], response_tokens[i+1], response_tokens[i+2], response_tokens[i+3], response_tokens[i+4]);
-					printf("%s\n", "------------------------------------------------------------------------------------------------------------------------");
-				}
-
-			}
-
-			return 1;
-		}
-		printf("%s\n", "[ERROR]: An internal error has occured while executing this command. Contact with admin.");
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*COMMAND_INVALID_PARAMS") == 0 )
-	{	
-		if ( 
-			 (strcmp(response_tokens[1], "CHGPWD") == 0)	||
-			 (strcmp(response_tokens[1], "KICK")   == 0)	|| 
-			 (strcmp(response_tokens[1], "MUTE")   == 0)	|| 
-			 (strcmp(response_tokens[1], "UNMUTE") == 0)	|| 
-			 (strcmp(response_tokens[1], "PM")     == 0)	|| 
-			 (strcmp(response_tokens[1], "DEOP")   == 0)	||
-			 (strcmp(response_tokens[1], "OP")     == 0)	||
-			 (strcmp(response_tokens[1], "RECORD") == 0)	||
-			 (strcmp(response_tokens[1], "STATUS") == 0)	||
-			 (strcmp(response_tokens[1], "TABLE")  == 0)	||
-			 (strcmp(response_tokens[1], "BAN")    == 0)	||
-			 (strcmp(response_tokens[1], "UNBAN")  == 0)
-		   ) 
+	else if ( strcmp(response_tokens[0], server_codes_list[COMMAND_INVALID_PARAMS_CODE]) == 0 )
+	{
+		if (
+				(strcmp(response_tokens[1], "CHGPWD") == 0)	||
+				(strcmp(response_tokens[1], "KICK")   == 0)	||
+				(strcmp(response_tokens[1], "MUTE")   == 0)	||
+				(strcmp(response_tokens[1], "UNMUTE") == 0)	||
+				(strcmp(response_tokens[1], "PM")     == 0)	||
+				(strcmp(response_tokens[1], "DEOP")   == 0)	||
+				(strcmp(response_tokens[1], "OP")     == 0)	||
+				(strcmp(response_tokens[1], "RECORD") == 0)	||
+				(strcmp(response_tokens[1], "STATUS") == 0)	||
+				(strcmp(response_tokens[1], "TABLE")  == 0)	||
+				(strcmp(response_tokens[1], "BAN")    == 0)	||
+				(strcmp(response_tokens[1], "UNBAN")  == 0)
+			)
 		{
 			printf("%s", "Incorrect command usage. ");
 
-			if ( strcmp(response_tokens[2], "TOO_MUCH_ARGS" ) == 0 )
+			if ( strcmp(response_tokens[2], subcommands_codes_list[TOO_MUCH_ARGS] ) == 0 )
 			{
-				printf("%s\n", "Number of arguments too much or few than command needs.");
+				printf("%s", "\n                            ");
+				printf("%s", "Number of arguments too much or few than command needs.\n");
+				
 				return 1;
 			}
-			if ( strcmp(response_tokens[2], "SELF_USE") == 0 )
+			if ( strcmp(response_tokens[2], subcommands_codes_list[SELF_USE]) == 0 )
 			{
-				printf("%s\n", "You can not apply this command to yourself!");
+				printf("%s", "\n                            ");
+				printf("%s", "You can not apply this command to yourself!\n");
+				
 				return 1;
 			}
-			if ( strcmp(response_tokens[2], "INCORRECT_USERNAME") == 0 )
+			if ( strcmp(response_tokens[2], subcommands_codes_list[INCORRECT_USERNAME]) == 0 )
 			{
-				printf("%s\n", "Check property of username");
+				printf("%s", "\n                            ");
+				printf("%s", "Check property of username.\n");
+
 				return 1;
 			}
-			if ( strcmp(response_tokens[2], "USER_NOT_FOUND") == 0 )
+			if ( strcmp(response_tokens[2], subcommands_codes_list[USER_NOT_FOUND]) == 0 )
 			{
-				printf("%s\n", "User not found in database file. Is it registered?");
+				printf("%s", "\n                            ");
+				printf("%s", "User not found in database file. Is it registered?\n");
+				
 				return 1;
 			}
-			if ( strcmp(response_tokens[2], "USER_OFFLINE") == 0 )
+			if ( strcmp(response_tokens[2], subcommands_codes_list[USER_OFFLINE]) == 0 )
 			{
-				printf("%s\n", "Unable to execute a command. User is offline.");
+				printf("%s", "\n                            ");
+				printf("%s", "Unable to execute a command. User is offline.\n");
+				
 				return 1;
 			}
-			if ( strcmp(response_tokens[2], "INCORRECT_TIME_VALUE") == 0 )
+			if ( strcmp(response_tokens[2], subcommands_codes_list[INCORRECT_TIME_VALUE]) == 0 )
 			{
-				printf("%s\n", "Time argument is not a number!");
+				printf("%s", "\n                            ");
+				printf("%s", "Time argument is not a number!\n");
+				
 				return 1;
 			}
-			if ( strcmp(response_tokens[2], "INCORRECT_TIME_RANGE") == 0 )
+			if ( strcmp(response_tokens[2], subcommands_codes_list[INCORRECT_TIME_RANGE]) == 0 )
 			{
-				printf("%s\n", "Time value in invalid range.");
+				printf("%s", "\n                            ");
+				printf("%s", "Time value in invalid range.\n");
+
 				return 1;
 			}
-			if ( strcmp(response_tokens[2], "INCORRECT_STRING_VALUE") == 0)
+			if ( strcmp(response_tokens[2], subcommands_codes_list[INCORRECT_STRING_VALUE]) == 0)
 			{
-				printf("%s\n", "Your parameter has an incorrect value!");
+				printf("%s", "\n                            ");
+				printf("%s", "Your parameter has an incorrect value!\n");
+				
 				return 1;
 			}
 		}
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*COMMAND_PARAMS_NO_NEED") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[COMMAND_PARAMS_NO_NEED_CODE]) == 0 )
 	{
-		printf("%s\n", "This command should be executed without params");
+		printf("%s", "\n                            ");
+		printf("%s", "This command should be executed without params.\n");
+		
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*COMMAND_NO_PERMS") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[COMMAND_NO_PERMS_CODE]) == 0 )
 	{
-		printf("%s\n", "You don't have permission to execute this command");
+		printf("%s", "\n                            ");
+		printf("%s", "You don't have permission to execute this command.\n");
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*UNKNOWN_COMMAND") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[UNKNOWN_COMMAND_CODE]) == 0 )
 	{
-		printf("%s\n", "Unknown command. Type /help to see commands list");
+		printf("%s", "\n                            ");
+		printf("%s", "Unknown command. Type \"/help\" to see commands list.\n");
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*NO_PERM_TO_CREATE_FILE") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[NO_PERM_TO_CREATE_FILE_CODE]) == 0 )
 	{
-		printf("%s\n", "Unable to create file\n"
-				       "Do you have permission to create files in this folder?");
+		printf("%s", "\n                            ");
+		printf("%s", "Unable to create file\n"
+				"Do you have permission to create files in this folder?\n");
+
 		return 1;
 	}
-	else if ( strcmp(response_tokens[0], "*SUCCESSFULLY_AUTHORIZED") == 0 )
+	else if ( strcmp(response_tokens[0], server_codes_list[INTERNAL_ERROR_CODE]) == 0 )
+	{
+		printf("%s", "\n                            ");
+		printf("%s", "An internal error has occured on server. Try later.\n");
+
+		return -1;
+	}
+	else if ( strcmp(response_tokens[0], server_codes_list[SUCCESSFULLY_AUTHORIZED_CODE]) == 0 )
 	{
 		printf("\033c");
-		printf("%s\n%s%s%s\n%s\n", "Welcome to GLOBAL chat room!",
-				                   "You authorized here as \"", response_tokens[1],
-								   "\"\nTo start chatting, just type text with ending ENTER",
-								   "Type /help to show valid commands for your group"
-			  );
+		printf("%s", "\n                            ");
+		printf("Welcome to GLOBAL chat room!\n");
+		printf("%s", "\n                            ");
+		printf("You authorized here as \"");
+		printf("%s", response_tokens[1]);
+		printf("\"\n");
+		printf("%s", "\n                            ");
+		printf("To start chatting, just type text with ending ENTER\n");
+		printf("%s", "\n                            ");
+		printf("Type \"/help\" to show valid commands for your group\n\n");
 
 		*authorized = 1;
 		return 1;

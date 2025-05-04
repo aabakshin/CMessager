@@ -62,8 +62,21 @@ const char* server_codes_list[SERVER_CODES_COUNT] = {
 									"*UNMUTE_COMMAND_YOU_UNMUTED",
 									"*USER_LEFT_CHAT",
 									"*USER_AUTHORIZED",
-									"*WHOIH_COMMAND_SUCCESS"
+									"*WHOIH_COMMAND_SUCCESS",
+									"*INTERNAL_ERROR"
 								};
+
+const char* subcommands_codes_list[SUBCOMMANDS_CODES_COUNT] =
+{
+							"TOO_MUCH_ARGS",
+							"SELF_USE",
+							"INCORRECT_USERNAME",
+							"USER_NOT_FOUND",
+							"USER_OFFLINE",
+							"INCORRECT_TIME_VALUE",
+							"INCORRECT_TIME_RANGE",
+							"INCORRECT_STRING_VALUE"
+};
 
 void clear_stdin(void)
 {

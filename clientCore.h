@@ -16,7 +16,7 @@
 
 enum
 {
-	EXIT_CODE						=			 -2,
+	EXIT_CODE						=			 -1,
 	MAX_RESPONSE_ARGS_NUM			=			100,
 	SELECT_TIMER_SEC				=			  0,
 	SELECT_TIMER_MSEC				=			300,

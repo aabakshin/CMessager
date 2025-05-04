@@ -27,6 +27,7 @@ static int server_accept_client(Server* serv_ptr);
 
 
 Server* server_ptr = NULL;
+extern const char* server_codes_list[SERVER_CODES_COUNT];
 
 static int exit_flag = 0;
 static int sig_number = 0;
@@ -135,7 +136,7 @@ int is_valid_auth_str(const char* user_auth_str, int authentication)
 	return 0;
 }
 
-void session_send_string(ClientSession *sess, const char *str)
+void session_send_string(ClientSession* sess, const char* str)
 {
 	char current_time[CURRENT_TIME_SIZE];
 
@@ -148,8 +149,28 @@ void session_send_string(ClientSession *sess, const char *str)
 		return;
 	}
 
-	int mes_size = strlen(str)+1;
-	int bytes_sent = write(sess->sockfd, str, mes_size);
+	char buffer[BUFFER_SIZE];
+	strcpy(buffer, str);
+	int len = strlen(buffer);
+
+	int nl_flag = 0;
+	for ( int i = 0; buffer[i]; i++ )
+	{
+		if ( buffer[i] == '\n' )
+		{
+			nl_flag = 1;
+			break;
+		}
+	}
+
+	if ( !nl_flag )
+	{
+		buffer[len] = '\n';
+		len++;
+		buffer[len] = '\0';
+	}
+
+	int bytes_sent = write(sess->sockfd, buffer, len);
 	printf("[%s] %s Sent %d bytes to %s\n", get_time_str(current_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, bytes_sent, sess->last_ip);
 
 	view_data(str, bytes_sent, 'c', 50);
@@ -349,7 +370,8 @@ static ClientSession* make_new_session(int sockfd, struct sockaddr_in* from)
 	sess->state					=			 fsm_start;
 	sess->user_status			=	    status_offline;
 
-	session_send_string(sess, "*CLIENT_HAS_ACCOUNT\n");
+
+	session_send_string(sess, server_codes_list[CLIENT_HAS_ACCOUNT_CODE]);
 
 	return sess;
 }
@@ -369,12 +391,12 @@ static void session_handler_has_account(Server* serv_ptr, ClientSession* sess, c
 
 	if ( check_client_answer(client_line) )
 	{
-		session_send_string(sess, "*LOGIN_WAIT_LOGIN\n");
+		session_send_string(sess, server_codes_list[LOGIN_WAIT_LOGIN_CODE]);
 		sess->state = fsm_login_process_wait_login;
 	}
 	else
 	{
-		session_send_string(sess, "*SIGNUP_WAIT_LOGIN\n");
+		session_send_string(sess, server_codes_list[SIGNUP_WAIT_LOGIN_CODE]);
 		sess->state = fsm_signup_wait_login;
 	}
 }
@@ -399,7 +421,7 @@ static void session_handler_login_wait_login(Server* serv_ptr, ClientSession* se
 	{
 		if ( strcmp(client_line, list->data) == 0 )
 		{
-			session_send_string(sess, "*LOGIN_ALREADY_AUTHORIZED\n");
+			session_send_string(sess, server_codes_list[LOGIN_ALREADY_AUTHORIZED_CODE]);
 			return;
 		}
 		list = list->next;
@@ -416,12 +438,12 @@ static void session_handler_login_wait_login(Server* serv_ptr, ClientSession* se
 	if ( index > -1 )
 	{
 		memcpy(sess->login, client_line, strlen(client_line)+1);
-		session_send_string(sess, "*LOGIN_WAIT_PASS\n");
+		session_send_string(sess, server_codes_list[LOGIN_WAIT_PASS_CODE]);
 		sess->state = fsm_login_process_wait_pass;
 		return;
 	}
 
-	session_send_string(sess, "*LOGIN_NOT_EXIST\n");
+	session_send_string(sess, server_codes_list[LOGIN_NOT_EXIST_CODE]);
 }
 
 static void send_message_authorized(Server* serv_ptr, ClientSession* sess, const char* str)
@@ -474,7 +496,7 @@ static void success_new_authorized(Server* serv_ptr, ClientSession* sess)
 	char str[BUFSIZE];
 	const char* strings[] =
 	{
-			"*SUCCESSFULLY_AUTHORIZED",
+			server_codes_list[SUCCESSFULLY_AUTHORIZED_CODE],
 			sess->login,
 			NULL
 	};
@@ -482,7 +504,7 @@ static void success_new_authorized(Server* serv_ptr, ClientSession* sess)
 
 	session_send_string(sess, str);
 
-	send_message_authorized(serv_ptr, sess, "*USER_AUTHORIZED");
+	send_message_authorized(serv_ptr, sess, server_codes_list[USER_AUTHORIZED_CODE]);
 }
 
 static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* sess, const char* client_line)
@@ -501,7 +523,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 	{
 		if ( strcmp(sess->login, list->data) == 0 )
 		{
-			session_send_string(sess, "*LOGIN_ALREADY_AUTHORIZED\n");
+			session_send_string(sess, server_codes_list[LOGIN_ALREADY_AUTHORIZED_CODE]);
 			sess->state = fsm_login_process_wait_login;
 			return;
 		}
@@ -519,7 +541,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 	if ( index < 0 )
 	{
 		fprintf(stderr, "[%s] %s Unable to find in database table user with \"%s\" name!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sess->login);
-		session_send_string(sess, "*LOGIN_NOT_EXIST\n");
+		session_send_string(sess, server_codes_list[LOGIN_NOT_EXIST_CODE]);
 		sess->state = fsm_error;
 		return;
 	}
@@ -582,7 +604,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 
 		const char* query_strings[] =
 		{
-						"DB_WRITELINE|",
+						"DB_WRITELINE",
 						sess->login,
 						"undefined",
 						rank,
@@ -626,7 +648,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		return;
 	}
 
-	session_send_string(sess, "*PASS_NOT_MATCH\n");
+	session_send_string(sess, server_codes_list[PASS_NOT_MATCH_CODE]);
 }
 
 static void session_handler_signup_wait_login(Server* serv_ptr, ClientSession* sess, const char* client_line)
@@ -655,17 +677,17 @@ static void session_handler_signup_wait_login(Server* serv_ptr, ClientSession* s
 		int index = atoi(id_param);
 		if ( index > -1 )
 		{
-			session_send_string(sess, "*LOGIN_ALREADY_USED\n");
+			session_send_string(sess, server_codes_list[LOGIN_ALREADY_USED_CODE]);
 			return;
 		}
 
 		memcpy(sess->login, client_line, strlen(client_line)+1);
-		session_send_string(sess, "*SIGNUP_WAIT_PASS\n");
+		session_send_string(sess, server_codes_list[SIGNUP_WAIT_PASS_CODE]);
 		sess->state = fsm_signup_wait_pass;
 		return;
 	}
 
-	session_send_string(sess, "*LOGIN_INCORRECT\n");
+	session_send_string(sess, server_codes_list[LOGIN_INCORRECT_CODE]);
 }
 
 static void session_handler_signup_wait_pass(Server* serv_ptr, ClientSession* sess, const char* client_line)
@@ -713,7 +735,7 @@ static void session_handler_signup_wait_pass(Server* serv_ptr, ClientSession* se
 
 		const char* query_strings[] =
 		{
-						"DB_WRITELINE|",
+						"DB_WRITELINE",
 						sess->login,
 						sess->pass,
 						rank,
@@ -757,7 +779,7 @@ static void session_handler_signup_wait_pass(Server* serv_ptr, ClientSession* se
 		return;
 	}
 
-	session_send_string(sess, "*NEW_PASS_INCORRECT\n");
+	session_send_string(sess, server_codes_list[NEW_PASS_INCORRECT_CODE]);
 }
 
 static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, const char* client_line)
@@ -783,13 +805,13 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 	switch ( cmd_num )
 	{
 		case CMD_CODE_INTERNAL_SERVER_ERROR:
-			session_send_string(sess, "*INTERNAL_ERROR\n");
+			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 			break;
 		case CMD_CODE_OVERLIMIT_LENGTH:
 			command_overlimit_length_handler(sess);
 			break;
 		case CMD_CODE_UNKNOWN_COMMAND:
-			session_send_string(sess, "*UNKNOWN_COMMAND\n");
+			session_send_string(sess, server_codes_list[UNKNOWN_COMMAND_CODE]);
 			break;
 		case CMD_CODE_TEXT_MESSAGE:
 			eval_mute_time_left(sess);
@@ -804,7 +826,7 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 				itoa(sess->mute_time_left, mtl, 9);
 				const char* strings[] =
 				{
-							"*MUTE_COMMAND_YOU_MUTED",
+							server_codes_list[MUTE_COMMAND_YOU_MUTED_CODE],
 							mtl,
 							NULL
 				};
@@ -832,7 +854,7 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 					fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"session_handler_wait_message\"[4]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 					cmd_args = NULL;
 				}
-				session_send_string(sess, "*UNKNOWN_COMMAND\n");
+				session_send_string(sess, server_codes_list[UNKNOWN_COMMAND_CODE]);
 			}
 			break;
 		case CMD_CODE_COMMAND_DEOP:
@@ -845,7 +867,7 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 					fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"session_handler_wait_message\"[5]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 					cmd_args = NULL;
 				}
-				session_send_string(sess, "*UNKNOWN_COMMAND\n");
+				session_send_string(sess, server_codes_list[UNKNOWN_COMMAND_CODE]);
 			}
 			break;
 		case CMD_CODE_COMMAND_PM:
@@ -859,7 +881,7 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 				itoa(sess->mute_time_left, mtl, 9);
 				const char* strings[] =
 				{
-							"*MUTE_COMMAND_YOU_MUTED",
+							server_codes_list[MUTE_COMMAND_YOU_MUTED_CODE],
 							mtl,
 							NULL
 				};
@@ -889,7 +911,7 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 					fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"session_handler_wait_message\"[9]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 					cmd_args = NULL;
 				}
-				session_send_string(sess, "*UNKNOWN_COMMAND\n");
+				session_send_string(sess, server_codes_list[UNKNOWN_COMMAND_CODE]);
 			}
 			break;
 		case CMD_CODE_COMMAND_UNMUTE:
@@ -902,7 +924,7 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 					fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"session_handler_wait_message\"[10]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 					cmd_args = NULL;
 				}
-				session_send_string(sess, "*UNKNOWN_COMMAND\n");
+				session_send_string(sess, server_codes_list[UNKNOWN_COMMAND_CODE]);
 			}
 			break;
 		case CMD_CODE_COMMAND_KICK:
@@ -915,7 +937,7 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 					fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"session_handler_wait_message\"[11]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 					cmd_args = NULL;
 				}
-				session_send_string(sess, "*UNKNOWN_COMMAND\n");
+				session_send_string(sess, server_codes_list[UNKNOWN_COMMAND_CODE]);
 			}
 			break;
 		case CMD_CODE_COMMAND_TABLE:
@@ -928,7 +950,7 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 					fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"session_handler_wait_message\"[12]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 					cmd_args = NULL;
 				}
-				session_send_string(sess, "*UNKNOWN_COMMAND\n");
+				session_send_string(sess, server_codes_list[UNKNOWN_COMMAND_CODE]);
 			}
 			break;
 		case CMD_CODE_COMMAND_BAN:
@@ -941,7 +963,7 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 					fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"session_handler_wait_message\"[13]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 					cmd_args = NULL;
 				}
-				session_send_string(sess, "*UNKNOWN_COMMAND\n");
+				session_send_string(sess, server_codes_list[UNKNOWN_COMMAND_CODE]);
 			}
 			break;
 		case CMD_CODE_COMMAND_UNBAN:
@@ -954,7 +976,7 @@ static void session_handler_wait_message(Server* serv_ptr, ClientSession* sess, 
 					fprintf(stderr, "[%s] %s Unable to clear cmd args(in \"session_handler_wait_message\"[14]). \"cmd_args\" value is %p\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE, cmd_args);
 					cmd_args = NULL;
 				}
-				session_send_string(sess, "UNKNOWN_COMMAND\n");
+				session_send_string(sess, server_codes_list[UNKNOWN_COMMAND_CODE]);
 			}
 	}
 }
@@ -1270,7 +1292,7 @@ void server_close_session(int sock_num, Server* serv_ptr)
 
 	const char* query_strings[] =
 	{
-					"DB_WRITELINE|",
+					"DB_WRITELINE",
 					close_sess->login,
 					"undefined",
 					"undefined",
@@ -1304,7 +1326,7 @@ void server_close_session(int sock_num, Server* serv_ptr)
 		sl_remove(&serv_ptr->clients_online, close_sess->login);
 
 	if ( close_sess->authorized )
-		send_message_authorized(serv_ptr, close_sess, "*USER_LEFT_CHAT|");
+		send_message_authorized(serv_ptr, close_sess, server_codes_list[USER_LEFT_CHAT_CODE]);
 
 	close(sock_num);
 	printf("[%s] %s Lost connection from %s\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, close_sess->last_ip);

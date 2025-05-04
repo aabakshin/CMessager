@@ -86,6 +86,8 @@ int main(int argc, char** argv)
 
 			char read_buf[BUFSIZE] = { 0 };
 			int bytes_received = recv(peer_sock, read_buf, BUFSIZE, 0);
+			printf("\nReceived %d bytes\n", bytes_received);
+
 
 			char current_time[MAX_TIME_STR_SIZE];
 			get_time_str(current_time, MAX_TIME_STR_SIZE);
@@ -117,17 +119,17 @@ int main(int argc, char** argv)
 			}
 			int response_tokens_size = i;
 
-			if ( check_server_response(peer_sock, response_tokens, response_tokens_size, &authorized) )
+			int response_answer = -1;
+			if ( (response_answer = check_server_response(peer_sock, response_tokens, response_tokens_size, &authorized)) )
 			{
-				printf("\nReceived %d bytes\n\n", bytes_received);
-				if ( exit_flag )
+				if ( response_answer == -1 )
 					break;
 
 				continue;
 			}
 
-			printf("\nReceived %d bytes\n", bytes_received);
-			printf("<<< [%s] %s (%s) => %s\n\n", current_time, response_tokens[0], response_tokens[1], response_tokens[2]);
+			if ( authorized )
+				printf("<<< [%s] %s (%s) => %s\n\n", current_time, response_tokens[0], response_tokens[1], response_tokens[2]);
 		}
 
 		if ( authorized && FD_ISSET(0, &readfds) )
@@ -221,7 +223,13 @@ int main(int argc, char** argv)
 					printf("\nYour code: %s\n", code);
 
 					int len = input(answer, 100);
+					if ( len < 1 )
+					{
+						failed_flag = 1;
+						break;
+					}
 					answer[len-1] = '\0';
+					
 
 					if ( strcmp(answer, code) == 0 )
 					{
