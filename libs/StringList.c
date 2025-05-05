@@ -1,7 +1,7 @@
 #ifndef STRINGLIST_C_SENTRY
 #define STRINGLIST_C_SENTRY
 
-#include "StringList.h"
+#include "../includes/StringList.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

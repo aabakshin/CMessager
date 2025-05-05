@@ -1,13 +1,14 @@
-#include "Commons.h"
-#include "clientCore.h"
-#include "DateTime.h"
-#include "Input.h"
-#include "CommandsHistoryList.h"
+#include "../includes/Commons.h"
+#include "../includes/clientCore.h"
+#include "../includes/DateTime.h"
+#include "../includes/Input.h"
+#include "../includes/CommandsHistoryList.h"
 
 
-extern CommandsHistoryList* chl_list;
+/* Буфер предыдущих отправленных команд/сообщений */
+CommandsHistoryList* chl_list = NULL;
+
 static int exit_flag = 0;
-
 
 void exit_handler(int signo)
 {
@@ -187,7 +188,10 @@ int main(int argc, char** argv)
 
 			int len = strlen(send_buf);
 			if ( send_buf[len-1] == '\n' )
-				send_buf[len-1] = '\0';
+			{
+				len--;
+				send_buf[len] = '\0';
+			}
 
 			chl_insert(&chl_list, send_buf, len+1);
 			int chl_size = chl_get_size(chl_list);
@@ -229,7 +233,7 @@ int main(int argc, char** argv)
 						break;
 					}
 					answer[len-1] = '\0';
-					
+
 
 					if ( strcmp(answer, code) == 0 )
 					{
@@ -253,7 +257,7 @@ int main(int argc, char** argv)
 					break;
 			}
 		}
-    }
+	}
 
 	/* очистка буфера отправленных команд */
 	chl_clear(&chl_list);

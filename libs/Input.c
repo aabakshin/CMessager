@@ -2,8 +2,9 @@
 #define INPUT_C_SENTRY
 
 
-#include "Input.h"
-#include "DebugUtils.h"
+#include "../includes/Input.h"
+#include "../includes/DebugUtils.h"
+#include "../includes/CommandsHistoryList.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,8 +40,16 @@ static int handle_newline_key(char* buffer, int buffer_size, int* i, int* left_o
 static int handle_backspace_key(char* buffer, int buffer_size, int* i, int* left_offset, char* ch_buf);
 static int handle_arrow_left_key(char* buffer, int buffer_size, int* i, int* left_offset, char* ch_buf);
 static int handle_arrow_right_key(char* buffer, int buffer_size, int* i, int* left_offset, char* ch_buf);
+static int handle_arrow_up_key(char* buffer, int buffer_size, int* i, int* left_offset, char* ch_buf);
+static int handle_arrow_down_key(char* buffer, int buffer_size, int* i, int* left_offset, char* ch_buf);
 static int handle_del_key(char* buffer, int buffer_size, int* i, int* left_offset, char* ch_buf);
 
+
+/* Буфер предыдущих отправленных команд */
+extern CommandsHistoryList* chl_list;
+
+/* Сохраняет текущую позицию на элемент списка chl_list */
+static CommandsHistoryList* cur_pos = NULL;
 
 /* UTF-16LE */
 const char rus_alpha_codes[] = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя";
@@ -227,6 +236,26 @@ static int get_str(char* buffer, int buffer_size)
 				handle_arrow_right_key(buffer, buffer_size, &i, &left_offset, read_sym);
 			}
 
+			/* обработка клавиши ARROW_UP с 3-байтным кодом */
+			else if (
+							( read_sym[0] == 0x1b )		&&		/* 27 */
+							( read_sym[1] == 0x5b )		&&		/* 91 */
+							( read_sym[2] == 0x41 )				/* 65 */
+					)
+			{
+				handle_arrow_up_key(buffer, buffer_size, &i, &left_offset, read_sym);
+			}
+
+			/* обработка клавиши ARROW_DOWN с 3-байтным кодом */
+			else if (
+							( read_sym[0] == 0x1b )		&&		/* 27 */
+							( read_sym[1] == 0x5b )		&&		/* 91 */
+							( read_sym[2] == 0x42 )				/* 66 */
+					)
+			{
+				handle_arrow_down_key(buffer, buffer_size, &i, &left_offset, read_sym);
+			}
+
 			memset(read_sym, 0, sizeof(read_sym));
 		}
 		else if ( rc == 4 )
@@ -245,6 +274,8 @@ static int get_str(char* buffer, int buffer_size)
 
 			memset(read_sym, 0, sizeof(read_sym));
 		}
+
+		memset(read_sym, 0, sizeof(read_sym));
 	}
 
 	/* длина строки buffer в байтах */
@@ -762,6 +793,85 @@ static int handle_arrow_right_key(char* buffer, int buffer_size, int* i, int* le
 			fflush(stdout);
 			(*left_offset)--;
 		}
+	}
+
+	return 1;
+}
+
+static int handle_arrow_up_key(char* buffer, int buffer_size, int* i, int* left_offset, char* ch_buf)
+{
+	if ( chl_list != NULL )
+	{
+		if ( *i > 0 )
+		{
+			while ( *i > 0 )
+			{
+				buffer[*i-1] = 0;
+				printf("%s", "\b \b");
+				(*i)--;
+			}
+			fflush(stdout);
+		}
+
+		if ( cur_pos != NULL )
+		{
+			if ( cur_pos->prev != NULL )
+			{
+				cur_pos = cur_pos->prev;
+			}
+		}
+		else
+		{
+			cur_pos = chl_list;
+		}
+
+
+		*i = 0;
+		for ( int j = 0; cur_pos->command[j]; j++, (*i)++ )
+			buffer[*i] = cur_pos->command[j];
+
+		printf("%s", cur_pos->command);
+		fflush(stdout);
+	}
+
+	return 1;
+}
+
+static int handle_arrow_down_key(char* buffer, int buffer_size, int* i, int* left_offset, char* ch_buf)
+{
+	if ( chl_list != NULL )
+	{
+		if ( *i > 0 )
+		{
+			while ( *i > 0 )
+			{
+				buffer[*i-1] = 0;
+				printf("%s", "\b \b");
+				(*i)--;
+			}
+			fflush(stdout);
+		}
+
+
+		if ( cur_pos != NULL )
+		{
+			if ( cur_pos->next != NULL )
+			{
+				cur_pos = cur_pos->next;
+			}
+		}
+		else
+		{
+			cur_pos = chl_list;
+		}
+
+
+		*i = 0;
+		for ( int j = 0; cur_pos->command[j]; j++, (*i)++ )
+			buffer[*i] = cur_pos->command[j];
+
+		printf("%s", cur_pos->command);
+		fflush(stdout);
 	}
 
 	return 1;

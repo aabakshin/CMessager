@@ -1,7 +1,7 @@
 #ifndef SESSION_LIST_C_SENTRY
 #define SESSION_LIST_C_SENTRY
 
-#include "SessionList.h"
+#include "../includes/SessionList.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

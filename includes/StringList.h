@@ -6,10 +6,10 @@ enum
 	DATA_SIZE = 21
 };
 
-struct StringList 
+struct StringList
 {
 	char data[DATA_SIZE];
-	struct StringList* next;	
+	struct StringList* next;
 	struct StringList* prev;
 };
 typedef struct StringList StringList;

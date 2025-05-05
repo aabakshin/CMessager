@@ -1,9 +1,9 @@
 #ifndef SERVERCONFIGS_C_SENTRY
 #define SERVERCONFIGS_C_SENTRY
 
-#include "Commons.h"
-#include "serverConfigs.h"
-#include "DateTime.h"
+#include "../includes/Commons.h"
+#include "../includes/serverConfigs.h"
+#include "../includes/DateTime.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,11 +1,11 @@
 #ifndef SERVERCORE_C_SENTRY
 #define SERVERCORE_C_SENTRY
 
-#include "serverCore.h"
-#include "DatabaseStructures.h"
-#include "DateTime.h"
-#include "Commons.h"
-#include "serverCommands.h"
+#include "../includes/serverCore.h"
+#include "../includes/DatabaseStructures.h"
+#include "../includes/DateTime.h"
+#include "../includes/Commons.h"
+#include "../includes/serverCommands.h"
 
 
 static int session_do_read(Server* serv_ptr, ClientSession* sess);
@@ -143,6 +143,7 @@ void session_send_string(ClientSession* sess, const char* str)
 	if ( (sess == NULL) || (str == NULL) )
 	{
 		fprintf(stderr, "[%s] %s In function \"session_send_string\" params \"sess\" or \"str\" is NULL\n", get_time_str(current_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+
 		if ( sess != NULL )
 			sess->state = fsm_error;
 
@@ -431,6 +432,7 @@ static void session_handler_login_wait_login(Server* serv_ptr, ClientSession* se
 	if ( !get_field_from_db(serv_ptr, id_param, client_line, ID) )
 	{
 		sess->state = fsm_error;
+		session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 		return;
 	}
 
@@ -470,8 +472,7 @@ static void send_message_authorized(Server* serv_ptr, ClientSession* sess, const
 	char message[100];
 	concat_request_strings(message, 100, strings);
 
-	int i;
-	for ( i = 0; i < serv_ptr->sess_array_size; i++ )
+	for ( int i = 0; i < serv_ptr->sess_array_size; i++ )
 	{
 		if ( ( serv_ptr->sess_array[i] ) )
 		{
@@ -534,6 +535,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 	if ( !get_field_from_db(serv_ptr, id_param, sess->login, ID) )
 	{
 		sess->state = fsm_error;
+		session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 		return;
 	}
 
@@ -550,6 +552,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 	if ( !get_field_from_db(serv_ptr, pass, sess->login, PASS) )
 	{
 		sess->state = fsm_error;
+		session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 		return;
 	}
 
@@ -564,6 +567,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		if ( !get_field_from_db(serv_ptr, sess->registration_date, sess->login, REGISTRATION_DATE) )
 		{
 			sess->state = fsm_error;
+			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 			return;
 		}
 
@@ -579,6 +583,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		if ( !get_field_from_db(serv_ptr, smt, sess->login, START_MUTE_TIME) )
 		{
 			sess->state = fsm_error;
+			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 			return;
 		}
 		sess->start_mute_time = atoi(smt);
@@ -587,6 +592,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		if ( !get_field_from_db(serv_ptr, smt, sess->login, MUTE_TIME) )
 		{
 			sess->state = fsm_error;
+			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 			return;
 		}
 		sess->mute_time = atoi(mt);
@@ -595,6 +601,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		if ( !get_field_from_db(serv_ptr, smt, sess->login, MUTED) )
 		{
 			sess->state = fsm_error;
+			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 			return;
 		}
 		sess->muted = atoi(muted);
@@ -626,6 +633,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		if ( !request_to_db(serv_ptr, response, BUFFER_SIZE, query_strings) )
 		{
 			sess->state = fsm_error;
+			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 			return;
 		}
 
@@ -633,6 +641,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		{
 			fprintf(stderr, "[%s] %s In function \"session_handler_login_wait_pass\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 			sess->state = fsm_error;
+			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 			return;
 		}
 
@@ -671,6 +680,7 @@ static void session_handler_signup_wait_login(Server* serv_ptr, ClientSession* s
 		if ( !get_field_from_db(serv_ptr, id_param, client_line, ID) )
 		{
 			sess->state = fsm_error;
+			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 			return;
 		}
 
@@ -757,6 +767,7 @@ static void session_handler_signup_wait_pass(Server* serv_ptr, ClientSession* se
 		if ( !request_to_db(serv_ptr, response, BUFFER_SIZE, query_strings) )
 		{
 			sess->state = fsm_error;
+			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 			return;
 		}
 
@@ -764,6 +775,7 @@ static void session_handler_signup_wait_pass(Server* serv_ptr, ClientSession* se
 		{
 			fprintf(stderr, "[%s] %s In function \"session_handler_signup_wait_pass\": unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 			sess->state = fsm_error;
+			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
 			return;
 		}
 
@@ -1027,6 +1039,7 @@ static void session_fsm_step(Server* serv_ptr, ClientSession* sess, char* client
 	}
 }
 
+/* проверка, закончено ли сообщение или это только его часть */
 static void session_check_lf(Server* serv_ptr, ClientSession* sess)
 {
 	char cur_time[CURRENT_TIME_SIZE];
@@ -1042,9 +1055,7 @@ static void session_check_lf(Server* serv_ptr, ClientSession* sess)
 	}
 
 	int pos = -1;
-
-	int i;
-	for ( i = 0; i < sess->buf_used; i++ )
+	for ( int i = 0; i < sess->buf_used; i++ )
 	{
 		if ( sess->buf[i] == '\n' )
 		{
@@ -1057,19 +1068,21 @@ static void session_check_lf(Server* serv_ptr, ClientSession* sess)
 		return;
 
 	char* client_line = malloc(pos+1);
-
 	memcpy(client_line, sess->buf, pos);
 	client_line[pos] = '\0';
 
 	sess->buf_used -= (pos+1);
 	memmove(sess->buf, sess->buf+pos+1, sess->buf_used);
+
 	if ( client_line[pos-1] == '\r' )
 		client_line[pos-1] = '\0';
 
-	printf("( %s )\n", client_line);
+	printf("[%s] %s ( %s )\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, client_line);
+
 	session_fsm_step(serv_ptr, sess, client_line);
 }
 
+/* чтение из сокета в накопительный буфер */
 static int session_do_read(Server* serv_ptr, ClientSession* sess)
 {
 	char cur_time[CURRENT_TIME_SIZE];
@@ -1080,7 +1093,8 @@ static int session_do_read(Server* serv_ptr, ClientSession* sess)
 		return 0;
 	}
 
-	int rc = read(sess->sockfd, sess->buf, BUFSIZE);
+	int bufp = sess->buf_used;
+	int rc = read(sess->sockfd, sess->buf + bufp, BUFSIZE - bufp);
 	printf("[%s] %s Received %d bytes from %s => ", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, rc, sess->last_ip);
 
 	if ( rc < 1 )
@@ -1100,16 +1114,14 @@ static int session_do_read(Server* serv_ptr, ClientSession* sess)
 	}
 
 	sess->buf_used += rc;
+	session_check_lf(serv_ptr, sess);
 
 	if ( sess->buf_used >= BUFSIZE )
 	{
 		fprintf(stderr, "[%s] %s Client's(%s) line is too long!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE, sess->login);
 		sess->state = fsm_error;
-
 		return 0;
 	}
-
-	session_check_lf(serv_ptr, sess);
 
 	if ( sess->state == fsm_finish )
 		return 0;
@@ -1313,12 +1325,14 @@ void server_close_session(int sock_num, Server* serv_ptr)
 	char response[BUFFER_SIZE];
 	if ( !request_to_db(serv_ptr, response, BUFFER_SIZE, query_strings) )
 	{
+		session_send_string(close_sess, server_codes_list[INTERNAL_ERROR_CODE]);
 		return;
 	}
 
 	if ( strcmp("DB_LINE_WRITE_SUCCESS", response) != 0 )
 	{
 		fprintf(stderr, "[%s] %s In function \"write_query_into_db\" unable to write a record into database tables.\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		session_send_string(close_sess, server_codes_list[INTERNAL_ERROR_CODE]);
 		return;
 	}
 

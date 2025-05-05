@@ -1,7 +1,7 @@
-#include "Config.h"
-#include "serverDatabase.h"
-#include "../Commons.h"
-#include "../DateTime.h"
+#include "../includes/Config.h"
+#include "../includes/serverDatabase.h"
+#include "../../includes/Commons.h"
+#include "../../includes/DateTime.h"
 
 int main(int argc, char** argv)
 {

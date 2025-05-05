@@ -1,12 +1,12 @@
 #ifndef SERVERDATABASE_C_SENTRY
 #define SERVERDATABASE_C_SENTRY
 
-#include "../Commons.h"
-#include "../DateTime.h"
-#include "../DatabaseStructures.h"
-#include "SessionList.h"
-#include "serverDatabase.h"
-#include "DatabaseMsgHandlers.h"
+#include "../../includes/Commons.h"
+#include "../../includes/DateTime.h"
+#include "../../includes/DatabaseStructures.h"
+#include "../includes/SessionList.h"
+#include "../includes/serverDatabase.h"
+#include "../includes/DatabaseMsgHandlers.h"
 
 
 static int exit_flag = 0;
@@ -96,6 +96,7 @@ static void db_server_force_stop(Server* serv_ptr)
 	exit(1);
 }
 
+/* чтение из сокета в накопительный буфер */
 static int db_session_do_read(Server* serv_ptr, Session* sess)
 {
 	char cur_time[CURRENT_TIME_SIZE];
@@ -112,17 +113,27 @@ static int db_session_do_read(Server* serv_ptr, Session* sess)
 		return 0;
 	}
 
-
-	int rc = read(sess->data->fd, sess->data->buf, BUFSIZE);
+	int bufp = sess->data->buf_used;
+	int rc = read(sess->data->fd, sess->data->buf + bufp, BUFSIZE - bufp);
 	printf("[%s] %s Received %d bytes from %s => ", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, rc, sess->data->addr);
 
 	if ( rc < 1 )
 	{
-		printf("%s\n", "()");
+		if ( rc == 0 )
+		{
+			printf("%s\n", "()");
+		}
+		else
+		{
+			printf("(errno value = %d\n)", errno);
+		}
+
 		return 0;
 	}
 
 	sess->data->buf_used += rc;
+
+	db_session_check_lf(serv_ptr, sess);
 
 	if ( sess->data->buf_used >= BUFSIZE )
 	{
@@ -130,11 +141,10 @@ static int db_session_do_read(Server* serv_ptr, Session* sess)
 		return 0;
 	}
 
-	db_session_check_lf(serv_ptr, sess);
-
 	return 1;
 }
 
+/* проверка, закончено ли сообщение или это только его часть */
 static void db_session_check_lf(Server* serv_ptr, Session* sess)
 {
 	char cur_time[CURRENT_TIME_SIZE];
@@ -171,16 +181,16 @@ static void db_session_check_lf(Server* serv_ptr, Session* sess)
 		fprintf(stderr, "[%s] %s In function \"db_session_check_lf\" unable to allocate memory to \"client_line\"\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return;
 	}
-
 	memcpy(client_line, sess->data->buf, pos);
 	client_line[pos] = '\0';
+
+	sess->data->buf_used -= (pos + 1);
+	memmove(sess->data->buf, sess->data->buf+pos+1, sess->data->buf_used);
+
 	if ( client_line[pos-1] == '\r' )
 		client_line[pos-1] = '\0';
 
-	memmove(sess->data->buf, sess->data->buf+pos+1, sess->data->buf_used);
-	sess->data->buf_used -= (pos + 1);
-
-	printf("[%s] %s Client Line: ( %s )\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, client_line);	/* debug */
+	printf("[%s] %s ( %s )\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, client_line);
 
 	db_session_message_handler(serv_ptr, sess, client_line);
 }

@@ -1,25 +1,23 @@
 #ifndef CLIENTCORE_C_SENTRY
 #define CLIENTCORE_C_SENTRY
 
-#include "Commons.h"
-#include "DateTime.h"
-#include "clientCore.h"
-#include "Input.h"
+#include "../includes/Commons.h"
+#include "../includes/DateTime.h"
+#include "../includes/clientCore.h"
+#include "../includes/Input.h"
+#include "../includes/Graphics.h"
 
 enum
 {
-	MAX_STRING_LENGTH					=			  52,
 	HAS_ACCOUNT_VALUE_LENGTH			=			   3,
 	VALID_SYMBOLS_NUM					=			  62,
 	MAX_TOKENS_NUM						=			 341,	/* если BUFSIZE = 1024 */
 };
 
 
-static void show_logo(void);
-static void print_horizontal_line(int offset, int line_length, char char_line);
-static void print_greeting_text_frame(const char** text_strings, int text_strings_size);
 static int send_answer(int peer_sock, const char** box_messages, int box_messages_size, int max_read_chars);
 static int view_record_success_result(char** response_tokens, int fields_num, int debug_mode);
+
 
 extern const char* server_codes_list[SERVER_CODES_COUNT];
 extern const char* subcommands_codes_list[SUBCOMMANDS_CODES_COUNT];
@@ -113,74 +111,6 @@ void delete_extra_spaces(char* read, int read_size)
 	///////////////////////////////////////////////////////////
 }
 
-static void show_logo(void)
-{
-	printf("\033c");
-	printf("%s",
-					"   $$$$$$$$\\  $$$$$$\\  $$$$$$$\\        $$$$$$\\  $$\\   $$\\  $$$$$$\\ $$$$$$$$\\\n"
-					"   \\__$$  __|$$  __$$\\ $$  __$$\\      $$  __$$\\ $$ |  $$ |$$  __$$\\\\__$$  __|\n"
-					"      $$ |   $$ /  \\__|$$ |  $$ |     $$ /  \\__|$$ |  $$ |$$ /  $$ |  $$ |   \n"
-					"      $$ |   $$ |      $$$$$$$  |     $$ |      $$$$$$$$ |$$$$$$$$ |  $$ |    \n"
-					"      $$ |   $$ |      $$  ____/      $$ |      $$  __$$ |$$  __$$ |  $$ |    \n"
-					"      $$ |   $$ |  $$\\ $$ |           $$ |  $$\\ $$ |  $$ |$$ |  $$ |  $$ |    \n"
-					"      $$ |   \\$$$$$$  |$$ |           \\$$$$$$  |$$ |  $$ |$$ |  $$ |  $$ |    \n"
-					"      \\__|    \\______/ \\__|            \\______/ \\__|  \\__|\\__|  \\__|  \\__|\n"
-					"\n\n");
-	fflush(stdout);
-}
-
-static void print_horizontal_line(int offset, int line_length, char char_line)
-{
-	int i;
-	for ( i = 1; i <= offset; i++ )
-		putchar(' ');
-
-	for ( i = 1; i <= line_length; i++ )
-		putchar(char_line);
-
-    for ( i = 1; i <= offset; i++ )
-		putchar(' ');
-}
-
-static void print_greeting_text_frame(const char** text_strings, int text_strings_size)
-{
-	print_horizontal_line(0, 14, ' ');
-	printf("%s\n", "Welcome to authorization page of my simple TCP chat.");
-	print_horizontal_line(14, MAX_STRING_LENGTH, '#');
-	putchar('\n');
-
-	int i;
-	for ( i = 0; i < text_strings_size; i++ )
-	{
-		int len = strlen(text_strings[i]);
-
-		if ( len > MAX_STRING_LENGTH-4 )
-			len = MAX_STRING_LENGTH-4;
-
-		print_horizontal_line(0, 14, ' ');
-		print_horizontal_line(0, 2, '#');
-
-		int is_odd = 0;
-		int offset_len;
-		( ((offset_len = MAX_STRING_LENGTH-4-len) % 2) != 0 ) ? is_odd = 1 : is_odd;
-		offset_len /= 2;
-
-		print_horizontal_line(0, offset_len, ' ');
-		int j;
-		for ( j = 0; j < len; j++ )
-			putchar(text_strings[i][j]);
-		( is_odd == 1 ) ? print_horizontal_line(0, offset_len+1, ' ') : print_horizontal_line(0, offset_len, ' ');
-
-		print_horizontal_line(0, 2, '#');
-		putchar('\n');
-	}
-
-	print_horizontal_line(14, MAX_STRING_LENGTH, '#');
-	putchar('\n');
-	print_horizontal_line(0, 14, ' ');
-	printf("%s", "Your answer: ");
-}
-
 static int send_answer(int peer_sock, const char** box_messages, int box_messages_size, int max_read_chars)
 {
 	// Размер message должен быть как минимум max_read_chars+2 байт
@@ -224,13 +154,13 @@ static int view_record_success_result(char** response_tokens, int fields_num, in
 			for ( int m = 0; m < i; m++ )
 				if ( args[m] )
 					free(args[m]);
-			
+
 			if ( args )
 				free(args);
 
 			return 0;
 		}
-		
+
 		int k;
 		for ( k = 0; response_tokens[j][k]; k++ )
 			args[i][k] = response_tokens[j][k];
@@ -510,7 +440,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], server_codes_list[CHGPWD_COMMAND_INCORRECT_PASS_CODE]) == 0 )
-	{	
+	{
 		printf("%s", "\n                            ");
 		printf("Incorrect password. Try to follow next rules:\n");
 		printf("%s", "\n                            ");
@@ -555,7 +485,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 	{
 		printf("%s", "\n                            ");
 		printf("%s", "Incorrect status! Type \"/status list\" to see list of valid statuses\n");
-		
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], server_codes_list[STATUS_COMMAND_ALREADY_SET_CODE]) == 0 )
@@ -594,10 +524,10 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 	else if ( strcmp(response_tokens[0], server_codes_list[RECORD_COMMAND_SUCCESS_CODE]) == 0 )
 	{
 		char cur_time[CURRENT_TIME_SIZE];
-		
+
 		printf("%s", "\033c");
 		printf("%s", "\n                            ");
-		
+
 		if ( strcmp(response_tokens[1], "debug") == 0 )
 		{
 			if ( !view_record_success_result(response_tokens, DEBUG_RECORD_FIELDS_NUM, 1) )
@@ -702,7 +632,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 		printf("------------------------------------------------------\n");
 		printf("| %-4s | %-25s | %-25s | %-25s | %-25s |\n", response_tokens[2], response_tokens[i+1], response_tokens[i+2], response_tokens[i+3], response_tokens[i+4]);
 		printf("------------------------------------------------------\n");
-		
+
 		printf("\n\n\n");
 
 		return 1;
@@ -730,14 +660,14 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			{
 				printf("%s", "\n                            ");
 				printf("%s", "Number of arguments too much or few than command needs.\n");
-				
+
 				return 1;
 			}
 			if ( strcmp(response_tokens[2], subcommands_codes_list[SELF_USE]) == 0 )
 			{
 				printf("%s", "\n                            ");
 				printf("%s", "You can not apply this command to yourself!\n");
-				
+
 				return 1;
 			}
 			if ( strcmp(response_tokens[2], subcommands_codes_list[INCORRECT_USERNAME]) == 0 )
@@ -751,21 +681,21 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			{
 				printf("%s", "\n                            ");
 				printf("%s", "User not found in database file. Is it registered?\n");
-				
+
 				return 1;
 			}
 			if ( strcmp(response_tokens[2], subcommands_codes_list[USER_OFFLINE]) == 0 )
 			{
 				printf("%s", "\n                            ");
 				printf("%s", "Unable to execute a command. User is offline.\n");
-				
+
 				return 1;
 			}
 			if ( strcmp(response_tokens[2], subcommands_codes_list[INCORRECT_TIME_VALUE]) == 0 )
 			{
 				printf("%s", "\n                            ");
 				printf("%s", "Time argument is not a number!\n");
-				
+
 				return 1;
 			}
 			if ( strcmp(response_tokens[2], subcommands_codes_list[INCORRECT_TIME_RANGE]) == 0 )
@@ -779,7 +709,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			{
 				printf("%s", "\n                            ");
 				printf("%s", "Your parameter has an incorrect value!\n");
-				
+
 				return 1;
 			}
 		}
@@ -789,7 +719,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 	{
 		printf("%s", "\n                            ");
 		printf("%s", "This command should be executed without params.\n");
-		
+
 		return 1;
 	}
 	else if ( strcmp(response_tokens[0], server_codes_list[COMMAND_NO_PERMS_CODE]) == 0 )

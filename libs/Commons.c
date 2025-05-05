@@ -1,8 +1,8 @@
 #ifndef COMMONS_C_SENTRY
 #define COMMONS_C_SENTRY
 
-#include "Commons.h"
-#include "DateTime.h"
+#include "../includes/Commons.h"
+#include "../includes/DateTime.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdio.h>

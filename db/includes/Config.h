@@ -1,7 +1,8 @@
 #ifndef CONFIG_H_SENTRY
 #define CONFIG_H_SENTRY
 
-#define CONFIG_NAME											"server.properties"
+#define CONFIG_PATH											"../"
+#define CONFIG_NAME											CONFIG_PATH"server.properties"
 
 #define CONFIG_SETTING_DEFAULT_DB_SIZE_NAME					"currentDbSize"
 #define CONFIG_SETTING_DEFAULT_DB_SIZE_VALUE				"10"

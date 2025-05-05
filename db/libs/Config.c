@@ -1,10 +1,10 @@
 #ifndef CONFIG_C_SENTRY
 #define CONFIG_C_SENTRY
 
-#include "../Commons.h"
-#include "Config.h"
-#include "../serverCore.h"
-#include "../DateTime.h"
+#include "../../includes/Commons.h"
+#include "../includes/Config.h"
+#include "../../includes/serverCore.h"
+#include "../../includes/DateTime.h"
 
 
 static const char* config_params_names[CONFIG_STRINGS_NUM] =
