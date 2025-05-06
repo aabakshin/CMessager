@@ -275,6 +275,11 @@ FILE* db_create_userinfo_table(int records_num, const char* table_name)
 	int read_size = db_userinfo_table_get_size(usr_fd);
 	if ( read_size < 0 )
 	{
+		fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" \"read_size\" is less than zero!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+
+		if ( usr_fd )
+			fclose(usr_fd);
+
 		return NULL;
 	}
 
@@ -296,6 +301,10 @@ FILE* db_create_userinfo_table(int records_num, const char* table_name)
 	if ( !new_record )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_create_userinfo_table\" memory error\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+
+		if ( usr_fd )
+			fclose(usr_fd);
+
 		return NULL;
 	}
 
@@ -479,7 +488,6 @@ FILE* db_create_usersessions_table(int records_num, const char* table_name)
 		return NULL;
 	}
 
-
 	FILE* sess_fd;
 	if ( (sess_fd = fopen(table_name, "rb+")) == NULL )
 	{
@@ -491,10 +499,14 @@ FILE* db_create_usersessions_table(int records_num, const char* table_name)
 		}
 	}
 
-
 	int read_size = db_usersessions_table_get_size(sess_fd);
 	if ( read_size < 0 )
 	{
+		fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" \"read_size\" is less than zero!\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+
+		if ( sess_fd )
+			fclose(sess_fd);
+
 		return NULL;
 	}
 
@@ -516,6 +528,10 @@ FILE* db_create_usersessions_table(int records_num, const char* table_name)
 	if ( !new_record )
 	{
 		fprintf(stderr, "[%s] %s In function \"db_create_usersessions_table\" memory error\n", get_time_str(cur_time,MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+
+		if ( sess_fd )
+			fclose(sess_fd);
+
 		return NULL;
 	}
 

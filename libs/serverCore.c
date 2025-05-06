@@ -54,7 +54,8 @@ void server_force_stop(Server* serv_ptr)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
-	printf("[%s] %s Stopping server...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	printf("\n[%s] %s Stopping server...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	fflush(stdout);
 
 	close(serv_ptr->db_sock);
 
@@ -76,13 +77,15 @@ void server_force_stop(Server* serv_ptr)
 		sl_clear(&serv_ptr->clients_online);
 		close(serv_ptr->ls);
 		free(serv_ptr);
+
+		fprintf(stderr, "[%s] %s Server has been force stopped!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE);
 	}
 	else
 	{
 		fprintf(stderr, "[%s] %s An error has occured while force stopping server!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 	}
 
-	printf("\n[%s] %s Closing socket..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	printf("[%s] %s Closing socket..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	exit(1);
 }
 
@@ -1077,7 +1080,7 @@ static void session_check_lf(Server* serv_ptr, ClientSession* sess)
 	if ( client_line[pos-1] == '\r' )
 		client_line[pos-1] = '\0';
 
-	printf("[%s] %s ( %s )\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, client_line);
+	printf("( %s )\n", client_line);
 
 	session_fsm_step(serv_ptr, sess, client_line);
 }

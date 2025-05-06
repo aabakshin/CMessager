@@ -34,6 +34,8 @@ void print_horizontal_line(int offset, int line_length, char char_line)
 
 	for ( i = 1; i <= offset; i++ )
 		putchar(' ');
+
+	fflush(stdout);
 }
 
 void print_greeting_text_frame(const char** text_strings, int text_strings_size)
@@ -73,6 +75,7 @@ void print_greeting_text_frame(const char** text_strings, int text_strings_size)
 	putchar('\n');
 	print_horizontal_line(0, 14, ' ');
 	printf("%s", "Your answer: ");
+	fflush(stdout);
 }
 
 #endif

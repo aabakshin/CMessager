@@ -3,9 +3,9 @@
 
 #include "../../includes/Commons.h"
 #include "../includes/Config.h"
-#include "../../includes/serverCore.h"
 #include "../../includes/DateTime.h"
-
+#include <string.h>
+#include <stdlib.h>
 
 static const char* config_params_names[CONFIG_STRINGS_NUM] =
 {
@@ -21,24 +21,23 @@ static const char* config_params_values[CONFIG_STRINGS_NUM] =
 				CONFIG_SETTING_DEFAULT_USERSSESSIONS_DB_NAME_VALUE
 };
 
-static char** parse_configuration_file(int* strings_count, FILE* cfg_fd);
+static char** parse_configuration_file(int* strings_count, FILE** cfg_fd);
 
 
-static char** parse_configuration_file(int* strings_count, FILE* cfg_fd)
+static char** parse_configuration_file(int* strings_count, FILE** cfg_fd)
 {
 	char cur_time[MAX_TIME_STR_SIZE];
 	*strings_count = 0;
 
-
 	/* пытаемся открыть конфиг-файл */
 	int unable_read = 0;
-	if ( !(cfg_fd = fopen(CONFIG_NAME, "r+")) )
+	if ( !(*cfg_fd = fopen(CONFIG_NAME, "r+")) )
 	{
 		unable_read = 1;
 		/* если файл не существовал, пытаемся его создать и приводим настройки к дефолтным значениям */
 		fprintf(stderr, "[%s] %s Unable to open file \"%s\". Creating new one..\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), WARN_MESSAGE_TYPE, CONFIG_NAME);
 
-		if ( !(cfg_fd = fopen(CONFIG_NAME, "w+")) )
+		if ( !(*cfg_fd = fopen(CONFIG_NAME, "w+")) )
 		{
 			fprintf(stderr, "[%s] %s Unable to create \"%s\" file. Do you have permission to this?\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, CONFIG_NAME);
 			return NULL;
@@ -62,22 +61,22 @@ static char** parse_configuration_file(int* strings_count, FILE* cfg_fd)
 			strncat(cfg_setting, config_params_values[j], len);
 			cfg_setting[pos] = '\0';
 
-			fprintf(cfg_fd, "%s\n", cfg_setting);
+			fprintf(*cfg_fd, "%s\n", cfg_setting);
 			j++;
 		}
 
-		rewind(cfg_fd);
+		rewind(*cfg_fd);
 		*strings_count = j;
 	}
 
 	if ( !unable_read )
 	{
 		int ch;
-		while ( (ch = fgetc(cfg_fd)) != EOF )
+		while ( (ch = fgetc(*cfg_fd)) != EOF )
 			if ( ch == '\n' )
 				(*strings_count)++;
 
-		rewind(cfg_fd);
+		rewind(*cfg_fd);
 	}
 
 	if ( *strings_count != CONFIG_STRINGS_NUM )
@@ -116,8 +115,8 @@ static char** parse_configuration_file(int* strings_count, FILE* cfg_fd)
 	i = 0;
 	while ( 1 )
 	{
-		fgets(config_strings[i], CONFIG_STRING_SIZE, cfg_fd);
-		if ( feof(cfg_fd) )
+		fgets(config_strings[i], CONFIG_STRING_SIZE, *cfg_fd);
+		if ( feof(*cfg_fd) )
 			break;
 
 		int len = strlen(config_strings[i]);
@@ -128,7 +127,7 @@ static char** parse_configuration_file(int* strings_count, FILE* cfg_fd)
 			break;
 	}
 
-	rewind(cfg_fd);
+	rewind(*cfg_fd);
 
 	return config_strings;
 }
@@ -147,7 +146,7 @@ FILE* read_configuration_file(ConfigFields* cfg)
 	int strings_count = 0;
 
 	FILE* cfg_fd = NULL;
-	char** config_strings = parse_configuration_file(&strings_count, cfg_fd);
+	char** config_strings = parse_configuration_file(&strings_count, &cfg_fd);
 
 	if ( (config_strings == NULL) || (strings_count == 0) )
 	{

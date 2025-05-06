@@ -1921,7 +1921,6 @@ void record_command_handler(ClientSession* sess, char** cmd_args, int args_num)
 		enum { REALNAME, AGE, QUOTE, DEBUG };
 		const char* valid_params[] = { "realname", "age", "quote", "debug", NULL };
 		int valid_param_flag = 0;
-		int update_flag = 0;
 
 		/* отправитель команды /record хочет получить расширенную информацию о другом пользователе(возможно и о себе) */
 		if ( (strcmp(buffer_param, valid_params[DEBUG]) == 0) )

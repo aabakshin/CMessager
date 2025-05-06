@@ -60,6 +60,9 @@ static void db_server_force_stop(Server* serv_ptr)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 
+	printf("\n[%s] %s Stopping server...\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	fflush(stdout);
+
 	if ( serv_ptr )
 	{
 		Session* sess = serv_ptr->sess_list;
@@ -85,14 +88,14 @@ static void db_server_force_stop(Server* serv_ptr)
 		if ( serv_ptr->server_data->sess_table_fd )
 			fclose(serv_ptr->server_data->sess_table_fd);
 
-		fprintf(stderr, "[%s] %s Unable to connect to remote host!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s Server has been force stopped!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), WARN_MESSAGE_TYPE);
 	}
 	else
 	{
 		fprintf(stderr, "[%s] %s An error has occured while force stopping server!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 	}
 
-	printf("\n[%s] %s Closing socket..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
+	printf("[%s] %s Closing socket..\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE);
 	exit(1);
 }
 
@@ -190,7 +193,7 @@ static void db_session_check_lf(Server* serv_ptr, Session* sess)
 	if ( client_line[pos-1] == '\r' )
 		client_line[pos-1] = '\0';
 
-	printf("[%s] %s ( %s )\n", get_time_str(cur_time, CURRENT_TIME_SIZE), INFO_MESSAGE_TYPE, client_line);
+	printf("( %s )\n", client_line);
 
 	db_session_message_handler(serv_ptr, sess, client_line);
 }
@@ -471,13 +474,22 @@ int db_server_init(int port, InitDbServData* server_data, ConfigFields* cfg_valu
 	FILE* usr_fd = NULL;
 	if ( !(usr_fd = db_create_userinfo_table(cfg_values->records_num, cfg_values->userinfo_filename)) )
 	{
-		return -1;
+		if ( cfg_fd )
+			fclose(cfg_fd);
+
+		return -2;
 	}
 
 	FILE* sess_fd = NULL;
 	if ( !(sess_fd = db_create_usersessions_table(cfg_values->records_num, cfg_values->usersessions_filename)) )
 	{
-		return -1;
+		if ( cfg_fd )
+			fclose(cfg_fd);
+
+		if ( usr_fd )
+			fclose(usr_fd);
+
+		return -3;
 	}
 
 	server_data->ls = listen_sock;
