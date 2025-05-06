@@ -1,2 +1,3 @@
 # CMessager
-This little app demonstrate basic functionalities of some network messagers
+This little app demonstrate basic functionalities of some network messagers.
+## Work in progress...
