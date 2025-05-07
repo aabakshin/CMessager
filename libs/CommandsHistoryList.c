@@ -50,7 +50,12 @@ int chl_insert(CommandsHistoryList** nodePtr, char* str, int str_size)
 
 		newPtr->command = malloc(sizeof(char) * str_size);
 		if ( newPtr->command == NULL )
+		{
+			if ( newPtr )
+				free(newPtr);
+
 			return 0;
+		}
 		newPtr->command_size = str_size;
 
 		int i;
@@ -86,7 +91,12 @@ int chl_insert(CommandsHistoryList** nodePtr, char* str, int str_size)
 
 		newPtr->command = malloc(sizeof(char) * str_size);
 		if ( newPtr->command == NULL )
+		{
+			if ( newPtr )
+				free(newPtr);
+
 			return 0;
+		}
 
 		newPtr->command_size = str_size;
 

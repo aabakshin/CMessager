@@ -361,6 +361,9 @@ static ClientSession* make_new_session(int sockfd, struct sockaddr_in* from)
 	char* buf_ip = concat_addr_port(ip, port);
 	if ( !buf_ip )
 	{
+		if ( sess )
+			free(sess);
+
 		fprintf(stderr, "[%s] %s function \"concat_addr_port\" didn't make correct address!\n", get_time_str(current_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return NULL;
 	}
@@ -592,7 +595,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		sess->start_mute_time = atoi(smt);
 
 		char mt[MUTE_TIME_SIZE];
-		if ( !get_field_from_db(serv_ptr, smt, sess->login, MUTE_TIME) )
+		if ( !get_field_from_db(serv_ptr, mt, sess->login, MUTE_TIME) )
 		{
 			sess->state = fsm_error;
 			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
@@ -601,7 +604,7 @@ static void session_handler_login_wait_pass(Server* serv_ptr, ClientSession* ses
 		sess->mute_time = atoi(mt);
 
 		char muted[MUTED_SIZE];
-		if ( !get_field_from_db(serv_ptr, smt, sess->login, MUTED) )
+		if ( !get_field_from_db(serv_ptr, muted, sess->login, MUTED) )
 		{
 			sess->state = fsm_error;
 			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
