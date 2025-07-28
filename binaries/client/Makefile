@@ -1,5 +1,6 @@
 CC = gcc
 SRC_PATH = ../../src
+LIB_PATH = ../../lib
 SRCMODULES = $(SRC_PATH)/Commons.c $(SRC_PATH)/clientCore.c $(SRC_PATH)/DateTime.c $(SRC_PATH)/Input.c $(SRC_PATH)/CommandsHistoryList.c $(SRC_PATH)/Graphics.c $(SRC_PATH)/DebugUtils.c
 OBJMODULES = $(SRCMODULES:.c=.o)
 CFLAGS = -Wall -g
@@ -21,4 +22,4 @@ debug: client
 	valgrind --leak-check=full -s --track-origins=yes --show-leak-kinds=all ./$^ $(ADDRESS) $(PORT)
 
 clean:
-	rm -rf $(OBJMODULES) $(OUTPUT_NAME)
+	rm -rf $(LIB_PATH)/Commons.o $(LIB_PATH)/clientCore.o $(LIB_PATH)/DateTime.o $(LIB_PATH)/Input.o $(LIB_PATH)/CommandsHistoryList.o $(LIB_PATH)/Graphics.o $(LIB_PATH)/DebugUtils.o $(OUTPUT_NAME)
