@@ -1,12 +1,12 @@
 #ifndef SERVERDATABASE_C_SENTRY
 #define SERVERDATABASE_C_SENTRY
 
-#include "../../includes/Commons.h"
-#include "../../includes/DateTime.h"
-#include "../../includes/DatabaseStructures.h"
-#include "../includes/SessionList.h"
-#include "../includes/serverDatabase.h"
-#include "../includes/DatabaseMsgHandlers.h"
+#include "../../src/Commons.h"
+#include "../../src/DateTime.h"
+#include "../../src/DatabaseStructures.h"
+#include "../src/SessionList.h"
+#include "../src/serverDatabase.h"
+#include "../src/DatabaseMsgHandlers.h"
 
 
 static int exit_flag = 0;

@@ -1,10 +1,10 @@
 CC = gcc
-LIBS_PATH = ../../libs
-SRCMODULES = $(LIBS_PATH)/Commons.c $(LIBS_PATH)/clientCore.c $(LIBS_PATH)/DateTime.c $(LIBS_PATH)/Input.c $(LIBS_PATH)/CommandsHistoryList.c $(LIBS_PATH)/Graphics.c $(LIBS_PATH)/DebugUtils.c
+SRC_PATH = ../../src
+SRCMODULES = $(SRC_PATH)/Commons.c $(SRC_PATH)/clientCore.c $(SRC_PATH)/DateTime.c $(SRC_PATH)/Input.c $(SRC_PATH)/CommandsHistoryList.c $(SRC_PATH)/Graphics.c $(SRC_PATH)/DebugUtils.c
 OBJMODULES = $(SRCMODULES:.c=.o)
 CFLAGS = -Wall -g
 OUTPUT_NAME = client
-ADDRESS = 192.168.88.128
+ADDRESS = 192.168.88.129
 PORT = 7777
 
 %.o: %.c
@@ -12,6 +12,7 @@ PORT = 7777
 
 client: client.c $(OBJMODULES)
 	$(CC) $(CFLAGS) $^ -o $(OUTPUT_NAME)
+	mv ../../src/*.o ../../lib/
 
 run: client
 	./$^ $(ADDRESS) $(PORT)

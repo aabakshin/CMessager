@@ -1,7 +1,7 @@
 #ifndef GRAPHICS_C_SENTRY
 #define GRAPHICS_C_SENTRY
 
-#include "../includes/Graphics.h"
+#include "Graphics.h"
 #include <stdio.h>
 #include <string.h>
 

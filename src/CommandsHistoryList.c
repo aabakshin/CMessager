@@ -1,7 +1,7 @@
 #ifndef COMMAND_HISTORY_LIST_C
 #define COMMAND_HISTORY_LIST_C
 
-#include "../includes/CommandsHistoryList.h"
+#include "CommandsHistoryList.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

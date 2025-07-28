@@ -1,9 +1,9 @@
 #ifndef CONFIG_C_SENTRY
 #define CONFIG_C_SENTRY
 
-#include "../../includes/Commons.h"
-#include "../includes/Config.h"
-#include "../../includes/DateTime.h"
+#include "../../src/Commons.h"
+#include "../src/Config.h"
+#include "../../src/DateTime.h"
 #include <string.h>
 #include <stdlib.h>
 

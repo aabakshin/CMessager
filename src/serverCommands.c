@@ -2,13 +2,13 @@
 #define SERVERCOMMANDS_C_SENTRY
 
 
-#include "../includes/DatabaseStructures.h"
-#include "../includes/StringList.h"
-#include "../includes/Commons.h"
-#include "../includes/DateTime.h"
-#include "../includes/serverCommands.h"
-#include "../includes/serverCore.h"
-#include "../includes/serverConfigs.h"
+#include "DatabaseStructures.h"
+#include "StringList.h"
+#include "Commons.h"
+#include "DateTime.h"
+#include "serverCommands.h"
+#include "serverCore.h"
+#include "serverConfigs.h"
 
 
 enum

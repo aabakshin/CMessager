@@ -1,6 +1,6 @@
 CC = gcc
-LIBS_PATH = ../../libs
-SRCMODULES = $(LIBS_PATH)/serverCore.c $(LIBS_PATH)/Commons.c $(LIBS_PATH)/DateTime.c $(LIBS_PATH)/StringList.c $(LIBS_PATH)/serverCommands.c $(LIBS_PATH)/serverConfigs.c
+SRC_PATH = ../../src
+SRCMODULES = $(SRC_PATH)/serverCore.c $(SRC_PATH)/Commons.c $(SRC_PATH)/DateTime.c $(SRC_PATH)/StringList.c $(SRC_PATH)/serverCommands.c $(SRC_PATH)/serverConfigs.c
 OBJMODULES = $(SRCMODULES:.c=.o)
 CFLAGS = -Wall -g
 OUTPUT_NAME = server
@@ -11,6 +11,7 @@ PORT = 7777
 
 server: server.c $(OBJMODULES)
 	$(CC) $(CFLAGS) $^ -o $(OUTPUT_NAME)
+	mv ../../src/*.o ../../lib/
 
 run: server
 	./$^ $(PORT)

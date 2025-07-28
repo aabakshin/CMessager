@@ -1,6 +1,6 @@
-#include "../../includes/serverCore.h"
-#include "../../includes/Commons.h"
-#include "../../includes/DateTime.h"
+#include "../../src/serverCore.h"
+#include "../../src/Commons.h"
+#include "../../src/DateTime.h"
 
 int main(int argc, char** argv)
 {

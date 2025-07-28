@@ -1,8 +1,8 @@
-#include "../../includes/Commons.h"
-#include "../../includes/clientCore.h"
-#include "../../includes/DateTime.h"
-#include "../../includes/Input.h"
-#include "../../includes/CommandsHistoryList.h"
+#include "../../src/Commons.h"
+#include "../../src/clientCore.h"
+#include "../../src/DateTime.h"
+#include "../../src/Input.h"
+#include "../../src/CommandsHistoryList.h"
 
 
 /* Буфер предыдущих отправленных команд/сообщений */

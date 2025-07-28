@@ -1,10 +1,10 @@
 #ifndef DATABASE_MSG_HANDLERS_C_SENTRY
 #define DATABASE_MSG_HANDLERS_C_SENTRY
 
-#include "../includes/DatabaseMsgHandlers.h"
-#include "../../includes/Commons.h"
-#include "../../includes/DateTime.h"
-#include "../../includes/DatabaseStructures.h"
+#include "../src/DatabaseMsgHandlers.h"
+#include "../../src/Commons.h"
+#include "../../src/DateTime.h"
+#include "../../src/DatabaseStructures.h"
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>

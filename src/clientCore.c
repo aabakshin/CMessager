@@ -1,11 +1,11 @@
 #ifndef CLIENTCORE_C_SENTRY
 #define CLIENTCORE_C_SENTRY
 
-#include "../includes/Commons.h"
-#include "../includes/DateTime.h"
-#include "../includes/clientCore.h"
-#include "../includes/Input.h"
-#include "../includes/Graphics.h"
+#include "Commons.h"
+#include "DateTime.h"
+#include "clientCore.h"
+#include "Input.h"
+#include "Graphics.h"
 
 enum
 {

@@ -1,6 +1,6 @@
 CC = gcc
-LIBS_PATH = ../libs
-SRCMODULES = $(LIBS_PATH)/Config.c $(LIBS_PATH)/serverDatabase.c ../$(LIBS_PATH)/Commons.c ../$(LIBS_PATH)/DateTime.c $(LIBS_PATH)/SessionList.c $(LIBS_PATH)/DatabaseMsgHandlers.c
+SRC_PATH = ../src
+SRCMODULES = $(SRC_PATH)/Config.c $(SRC_PATH)/serverDatabase.c ../$(SRC_PATH)/Commons.c ../$(SRC_PATH)/DateTime.c $(SRC_PATH)/SessionList.c $(SRC_PATH)/DatabaseMsgHandlers.c
 OBJMODULES = $(SRCMODULES:.c=.o)
 CFLAGS = -Wall -g
 OUTPUT_NAME = db_server
@@ -11,6 +11,7 @@ PORT = 7778
 
 db_server: db_server.c $(OBJMODULES)
 	$(CC) $(CFLAGS) $^ -o $(OUTPUT_NAME)
+	mv ../src/*.o ../lib/
 
 run: db_server
 	./$^ $(PORT)

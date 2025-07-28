@@ -1,10 +1,9 @@
 #ifndef INPUT_C_SENTRY
 #define INPUT_C_SENTRY
 
-
-#include "../includes/Input.h"
-#include "../includes/DebugUtils.h"
-#include "../includes/CommandsHistoryList.h"
+/*#include "DebugUtils.h"*/												/* Used for print_buffer() function call */
+#include "Input.h"
+#include "CommandsHistoryList.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

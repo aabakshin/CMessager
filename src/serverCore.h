@@ -17,7 +17,7 @@
 #include <signal.h>
 #include <time.h>
 
-#define SERVER_DATABASE_ADDR			"192.168.88.128"
+#define SERVER_DATABASE_ADDR			"192.168.88.129"
 #define SERVER_DATABASE_PORT			"7778"
 
 

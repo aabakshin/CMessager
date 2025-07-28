@@ -1,11 +1,11 @@
 #ifndef SERVERCORE_C_SENTRY
 #define SERVERCORE_C_SENTRY
 
-#include "../includes/serverCore.h"
-#include "../includes/DatabaseStructures.h"
-#include "../includes/DateTime.h"
-#include "../includes/Commons.h"
-#include "../includes/serverCommands.h"
+#include "serverCore.h"
+#include "DatabaseStructures.h"
+#include "DateTime.h"
+#include "Commons.h"
+#include "serverCommands.h"
 
 
 static int session_do_read(Server* serv_ptr, ClientSession* sess);

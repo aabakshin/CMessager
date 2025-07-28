@@ -1,7 +1,7 @@
 #ifndef DEBUGUTILS_C
 #define DEBUGUTILS_C
 
-#include "../includes/DebugUtils.h"
+#include "DebugUtils.h"
 #include <stdio.h>
 
 void print_buffer(const char* buffer, int buffer_size)
