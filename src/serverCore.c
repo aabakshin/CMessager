@@ -28,9 +28,9 @@ static int server_accept_client(Server* serv_ptr);
 
 Server* server_ptr = NULL;
 extern const char* server_codes_list[SERVER_CODES_COUNT];
-
 static int exit_flag = 0;
 static int sig_number = 0;
+
 
 enum
 {				TIMEOUT 							=			 3,
@@ -273,7 +273,6 @@ int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int
 		return 0;
 	}
 
-	char response[BUFFER_SIZE];
 	const char* request[] =
 	{
 			"DB_READLINE",
@@ -281,6 +280,7 @@ int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int
 			NULL
 	};
 
+	char response[BUFFER_SIZE] = { 0 };
 	if ( !request_to_db(serv_ptr, response, BUFFER_SIZE, request) )
 	{
 		return 0;
@@ -685,10 +685,9 @@ static void session_handler_signup_wait_login(Server* serv_ptr, ClientSession* s
 		char id_param[ID_SIZE];
 		if ( !get_field_from_db(serv_ptr, id_param, client_line, ID) )
 		{
-			sess->state = fsm_error;
-			session_send_string(sess, server_codes_list[INTERNAL_ERROR_CODE]);
-			return;
+			strcpy(id_param, "-1");
 		}
+
 
 		int index = atoi(id_param);
 		if ( index > -1 )

@@ -7,8 +7,8 @@
 
 /* Буфер предыдущих отправленных команд/сообщений */
 CommandsHistoryList* chl_list = NULL;
-
 static int exit_flag = 0;
+
 
 void exit_handler(int signo)
 {
@@ -18,6 +18,19 @@ void exit_handler(int signo)
 	exit_flag = 1;
 
 	errno = save_errno;
+}
+
+void client_close_connection(int peer_sock)
+{
+	/* очистка буфера отправленных команд */
+	chl_clear(&chl_list);
+
+	printf("\n%s\n", "Closing socket..");
+	close(peer_sock);
+
+	printf("\n%s\n", "Finished");
+
+	exit(0);
 }
 
 int main(int argc, char** argv)
@@ -45,7 +58,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	printf("\033c");
+	printf("\033c");	/* work on VT100 terminal series only */
 
 	long long timestamps[2] = { 0 };
 	long long interval;
@@ -70,7 +83,10 @@ int main(int argc, char** argv)
 		{
 			if ( errno == EINTR )
 			{
-				fprintf(stderr, "%s", "\nGot some signal.\n");
+				if ( exit_flag )
+					client_close_connection(peer_sock);
+
+				//fprintf(stderr, "%s", "\nGot some signal.\n");
 				continue;
 			}
 
@@ -135,8 +151,6 @@ int main(int argc, char** argv)
 
 		if ( authorized && FD_ISSET(0, &readfds) )
 		{
-			int return_flag = 0;
-
 			char send_buf[BUFSIZE] = { 0 };
 			do
 			{
@@ -146,7 +160,7 @@ int main(int argc, char** argv)
 				{
 					if ( str_len == EXIT_CODE )
 					{
-						return_flag = 1;
+						exit_flag = 1;
 						break;
 					}
 
@@ -158,8 +172,10 @@ int main(int argc, char** argv)
 			}
 			while ( (send_buf[0] == '\n') || (send_buf[0] == '\0') );
 
-			if ( return_flag )
-				break;
+
+			if ( exit_flag )
+				client_close_connection(peer_sock);
+
 
 			int sent_bytes = restrict_message_length(send_buf);
 
@@ -258,14 +274,6 @@ int main(int argc, char** argv)
 			}
 		}
 	}
-
-	/* очистка буфера отправленных команд */
-	chl_clear(&chl_list);
-
-	printf("\n%s\n", "Closing socket..");
-	close(peer_sock);
-
-	printf("\n%s\n", "Finished");
 
 	return 0;
 }

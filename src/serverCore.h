@@ -136,12 +136,11 @@ typedef struct
 /* Client interface */
 void session_send_string(ClientSession *sess, const char *str);
 
-/* low-level interface function to make request to database */
+
 int request_to_db(Server* serv_ptr, char* response, int response_size, const char** query_strings);
-/* high-level interface function to make request to database */
 int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int field_code);
 
-/* Server interface */
+
 int is_valid_auth_str(const char *user_auth_str, int authentication);
 int server_init(int port, Server* serv_ptr);
 void server_close_session(int sock_num, Server* serv_ptr);
