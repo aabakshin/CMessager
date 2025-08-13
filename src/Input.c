@@ -48,7 +48,7 @@ static int handle_del_key(char* buffer, int buffer_size, int* i, int* left_offse
 extern CommandsHistoryList* chl_list;
 
 /* Сохраняет текущую позицию на элемент списка chl_list */
-static CommandsHistoryList* cur_pos = NULL;
+static CommandsHistoryList* cur_pos_list = NULL;
 
 /* UTF-16LE */
 const char rus_alpha_codes[] = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя";
@@ -84,7 +84,8 @@ int get_any_key(void)
 	char read_sym[MAX_SYM_CODE_SIZE] = { 0 };
 	while ( 1 )
 	{
-		int rc = read(0, read_sym, 6);	/* 6 - макс. размер в байтах кода клавиши на клавиатуре(F1-F12) */
+		/* 6 - макс. размер в байтах кода клавиши на клавиатуре(F1-F12) */
+		int rc = read(0, read_sym, 6);
 
 		if ( rc < 1 )
 			continue;
@@ -144,7 +145,8 @@ static int get_str(char* buffer, int buffer_size)
 
 	while ( 1 )
 	{
-		int rc = read(0, read_sym, 6);	/* 6 - макс. размер в байтах кода клавиши на клавиатуре(F1-F12) */
+		/* 6 - макс. размер в байтах кода клавиши на клавиатуре(F1-F12) */
+		int rc = read(0, read_sym, 6);
 
 		if ( rc < 1 )
 			continue;
@@ -812,24 +814,24 @@ static int handle_arrow_up_key(char* buffer, int buffer_size, int* i, int* left_
 			fflush(stdout);
 		}
 
-		if ( cur_pos != NULL )
+		if ( cur_pos_list != NULL )
 		{
-			if ( cur_pos->prev != NULL )
+			if ( cur_pos_list->prev != NULL )
 			{
-				cur_pos = cur_pos->prev;
+				cur_pos_list = cur_pos_list->prev;
 			}
 		}
 		else
 		{
-			cur_pos = chl_list;
+			cur_pos_list = chl_list;
 		}
 
 
 		*i = 0;
-		for ( int j = 0; cur_pos->command[j]; j++, (*i)++ )
-			buffer[*i] = cur_pos->command[j];
+		for ( int j = 0; cur_pos_list->command[j]; j++, (*i)++ )
+			buffer[*i] = cur_pos_list->command[j];
 
-		printf("%s", cur_pos->command);
+		printf("%s", cur_pos_list->command);
 		fflush(stdout);
 	}
 
@@ -852,24 +854,24 @@ static int handle_arrow_down_key(char* buffer, int buffer_size, int* i, int* lef
 		}
 
 
-		if ( cur_pos != NULL )
+		if ( cur_pos_list != NULL )
 		{
-			if ( cur_pos->next != NULL )
+			if ( cur_pos_list->next != NULL )
 			{
-				cur_pos = cur_pos->next;
+				cur_pos_list = cur_pos_list->next;
 			}
 		}
 		else
 		{
-			cur_pos = chl_list;
+			cur_pos_list = chl_list;
 		}
 
 
 		*i = 0;
-		for ( int j = 0; cur_pos->command[j]; j++, (*i)++ )
-			buffer[*i] = cur_pos->command[j];
+		for ( int j = 0; cur_pos_list->command[j]; j++, (*i)++ )
+			buffer[*i] = cur_pos_list->command[j];
 
-		printf("%s", cur_pos->command);
+		printf("%s", cur_pos_list->command);
 		fflush(stdout);
 	}
 

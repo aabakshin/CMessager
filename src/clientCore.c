@@ -6,6 +6,8 @@
 #include "clientCore.h"
 #include "Input.h"
 #include "Graphics.h"
+#include "CommandsHistoryList.h"
+
 
 enum
 {
@@ -19,10 +21,12 @@ static int send_answer(int peer_sock, const char** box_messages, int box_message
 static int view_record_success_result(char** response_tokens, int fields_num, int debug_mode);
 
 
+extern CommandsHistoryList* chl_list;
 extern const char* server_codes_list[SERVER_CODES_COUNT];
 extern const char* subcommands_codes_list[SUBCOMMANDS_CODES_COUNT];
 
-char* get_code(void)
+
+char* get_captcha_code(void)
 {
 	char cur_time[CURRENT_TIME_SIZE];
 	const char* symbols = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -30,7 +34,7 @@ char* get_code(void)
 	char* buf = malloc(CAPTCHA_CODE_LENGTH+1);
 	if ( !buf )
 	{
-		fprintf(stderr, "\n[%s] %s In function \"get_code\" memory error\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "\n[%s] %s In function \"get_captcha_code\" memory error\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
 		return NULL;
 	}
 
@@ -217,6 +221,19 @@ int client_init(const char* address, const char* port)
 	printf("%s\n", "Connected.");
 
 	return peer_sock;
+}
+
+void client_close_connection(int peer_sock)
+{
+	/* очистка буфера отправленных команд */
+	chl_clear(&chl_list);
+
+	printf("\n%s\n", "Closing socket..");
+	close(peer_sock);
+
+	printf("\n%s\n", "Finished");
+
+	exit(0);
 }
 
 /* Обработка полученной информации от сервера в соответствии с протоколом общения */

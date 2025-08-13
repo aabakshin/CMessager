@@ -7,6 +7,8 @@
 
 /* Буфер предыдущих отправленных команд/сообщений */
 CommandsHistoryList* chl_list = NULL;
+
+/* Флаг выхода из программы */
 static int exit_flag = 0;
 
 
@@ -20,18 +22,69 @@ void exit_handler(int signo)
 	errno = save_errno;
 }
 
-void client_close_connection(int peer_sock)
+void spam_module_process(int peer_sock)
 {
-	/* очистка буфера отправленных команд */
-	chl_clear(&chl_list);
+	int number_tries = ANTISPAM_MODULE_TRIES_NUMBER;
+	int gen_code_tries = 3;
 
-	printf("\n%s\n", "Closing socket..");
-	close(peer_sock);
 
-	printf("\n%s\n", "Finished");
+	printf("\n%s\n", "Before send next message, enter the following code(you have 2 tries)");
+	do
+	{
+		char user_answer[100] = { 0 };
+		char* captcha_str = NULL;
+		int gen_code_counter = 0;
 
-	exit(0);
+		do
+		{
+			captcha_str = get_captcha_code();
+			++gen_code_counter;
+
+			if ( !captcha_str )
+			{
+				if ( gen_code_counter >= gen_code_tries )
+				{
+					fprintf(stderr, "%s", "\nUnable to create code: \"code\" is NULL pointer!\n");
+					client_close_connection(peer_sock);
+				}
+			}
+			else
+				break;
+		}
+		while ( gen_code_counter < gen_code_tries );
+		printf("\nYour code: %s\n", captcha_str);
+
+
+		int len = input(user_answer, 100);
+		if ( len < 1 )
+		{
+			printf("\n%s\n", "Input length is empty!");
+			free(captcha_str);
+			client_close_connection(peer_sock);
+		}
+		user_answer[len-1] = '\0';
+
+
+		if ( strcmp(user_answer, captcha_str) == 0 )
+		{
+			printf("\n%s\n", "You can continue messaging");
+			free(captcha_str);
+			return;
+		}
+
+		free(captcha_str);
+		number_tries--;
+
+		if ( number_tries < 1 )
+		{
+			printf("\n%s\n", "You have failed spam-checking. Goodbye.");
+			client_close_connection(peer_sock);
+		}
+		printf("\nWrong code! Try again. You have %d tries.\n", number_tries);
+	}
+	while ( number_tries > 0 );
 }
+
 
 int main(int argc, char** argv)
 {
@@ -155,7 +208,7 @@ int main(int argc, char** argv)
 			do
 			{
 				int str_len = input(send_buf, BUFSIZE);
-
+				printf("\nstr_len = %d\n", str_len);
 				if ( str_len < 1 )
 				{
 					if ( str_len == EXIT_CODE )
@@ -163,7 +216,6 @@ int main(int argc, char** argv)
 						exit_flag = 1;
 						break;
 					}
-
 					continue;
 				}
 
@@ -172,12 +224,11 @@ int main(int argc, char** argv)
 			}
 			while ( (send_buf[0] == '\n') || (send_buf[0] == '\0') );
 
-
 			if ( exit_flag )
 				client_close_connection(peer_sock);
 
-
 			int sent_bytes = restrict_message_length(send_buf);
+
 
 
 			/*								анти-спам модуль								*/
@@ -198,22 +249,22 @@ int main(int argc, char** argv)
 			if ( interval < 0 )
 				interval *= -1;
 
+
 			sendall(peer_sock, send_buf, &sent_bytes);
 			printf("Sent %d bytes\n\n", sent_bytes);
-			messages_counter++;
+			++messages_counter;
+
 
 			int len = strlen(send_buf);
 			if ( send_buf[len-1] == '\n' )
-			{
-				len--;
-				send_buf[len] = '\0';
-			}
+				send_buf[len-1] = '\0';
 
 			chl_insert(&chl_list, send_buf, len+1);
 			int chl_size = chl_get_size(chl_list);
 
 			if ( chl_size > HISTORY_COMMANDS_LIST_SIZE )
 				chl_delete(&chl_list, chl_list->number);
+
 
 			if ( messages_counter >= ANTISPAM_MODULE_MSG_CNT )
 			{
@@ -227,50 +278,8 @@ int main(int argc, char** argv)
 				messages_counter = 0;
 				start_signal = 0;
 				total_time = ANTISPAM_MODULE_TOTAL_TIME_MS;
-				int number_tries = ANTISPAM_MODULE_TRIES_NUMBER;
 
-				int failed_flag = 0;
-				printf("\n%s\n", "Before send next message, enter the following code(you have 2 tries)");
-				do
-				{
-					char answer[100] = { 0 };
-					char* code = get_code();
-					if ( !code )
-					{
-						fprintf(stderr, "%s", "\nUnable to create code: memory error\n");
-						continue;
-					}
-					printf("\nYour code: %s\n", code);
-
-					int len = input(answer, 100);
-					if ( len < 1 )
-					{
-						failed_flag = 1;
-						break;
-					}
-					answer[len-1] = '\0';
-
-
-					if ( strcmp(answer, code) == 0 )
-					{
-						printf("\n%s\n", "You can continue to chat.");
-						free(code);
-						break;
-					}
-					free(code);
-					number_tries--;
-					if ( number_tries < 1 )
-					{
-						printf("\n%s\n", "You have failed spam-checking. Goodbye.");
-						failed_flag = 1;
-						break;
-					}
-					printf("\nWrong code! Try again. You have %d tries.\n", number_tries);
-				}
-				while ( number_tries > 0 );
-
-				if ( failed_flag )
-					break;
+				spam_module_process(peer_sock);
 			}
 		}
 	}

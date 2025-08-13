@@ -36,8 +36,11 @@ enum
 
 int check_server_response(int peer_sock, char** response_tokens, int response_tokens_size, int* authorized);
 int client_init(const char* address, const char* port);
+void client_close_connection(int peer_sock);
+
+
 int restrict_message_length(char* read);
 void delete_extra_spaces(char* read, int read_size);
-char* get_code(void);
+char* get_captcha_code(void);
 
 #endif
