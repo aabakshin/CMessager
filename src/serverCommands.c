@@ -3061,31 +3061,37 @@ void text_message_handler(ClientSession *sess, const char *msg, int is_private, 
 	buf[i] = '\0';
 	int buf_len = strlen(buf);
 
-	int cur_pos;
+
+	for ( i = 0; server_codes_list[SIMPLE_MESSAGE_RECEIVED_CODE][i]; i++ )
+	{
+		str[i] = server_codes_list[SIMPLE_MESSAGE_RECEIVED_CODE][i];
+	}
+	str[i] = '|';
+	i++;
+
+
 	if ( sess->rank == ADMIN_RANK_VALUE )
 	{
 		const char* prefix = "[ADMIN]";
-		for ( i = 0; prefix[i]; i++ )
-			str[i] = prefix[i];
+		for ( int j = 0; prefix[j]; i++, j++ )
+			str[i] = prefix[j];
 	}
 	else
 	{
-		i = 0;
 		str[i] = ' ';
 		i++;
 	}
 	str[i] = '|';
 	i++;
-	cur_pos = i;
 
 	if ( is_private )
 	{
-		str[cur_pos] = '~';
-		cur_pos++;
+		str[i] = '~';
+		i++;
 	}
 
-	int j;
-	for ( j = 0; sess->login[j]; cur_pos++, j++ )
+	int cur_pos = i;
+	for ( int j = 0; sess->login[j]; cur_pos++, j++ )
 		str[cur_pos] = sess->login[j];
 	str[cur_pos] = '|';
 	cur_pos++;
@@ -3115,6 +3121,7 @@ void text_message_handler(ClientSession *sess, const char *msg, int is_private, 
 	}
 
 	int k;
+	int j;
 	for ( k = 0, j = 0; buf[j]; j++, k++ )
 	{
 		if ( buf[j] == ' ' )
@@ -3138,10 +3145,12 @@ void text_message_handler(ClientSession *sess, const char *msg, int is_private, 
 	cur_pos++;
 	str[cur_pos] = '\0';
 	cur_pos++;
+	int mes_size = cur_pos;
+
 
 	free(buffer_str);
 
-	int mes_size = strlen(str)+1;
+
 	for ( i = 0; i < server_ptr->sess_array_size; i++ )
 	{
 		if ( server_ptr->sess_array[i] )

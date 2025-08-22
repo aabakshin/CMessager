@@ -33,7 +33,8 @@ static int sig_number = 0;
 
 
 enum
-{				TIMEOUT 							=			 3,
+{
+				TIMEOUT 							=			 3,
 				TOKENS_NUM							=			16,
 				DEFAULT_MAX_SESSIONS_COUNT			=			10
 };

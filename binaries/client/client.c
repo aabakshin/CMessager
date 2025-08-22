@@ -1,6 +1,5 @@
 #include "../../src/Commons.h"
 #include "../../src/clientCore.h"
-#include "../../src/DateTime.h"
 #include "../../src/Input.h"
 #include "../../src/CommandsHistoryList.h"
 
@@ -20,69 +19,6 @@ void exit_handler(int signo)
 	exit_flag = 1;
 
 	errno = save_errno;
-}
-
-void spam_module_process(int peer_sock)
-{
-	int number_tries = ANTISPAM_MODULE_TRIES_NUMBER;
-	int gen_code_tries = 3;
-
-
-	printf("\n%s\n", "Before send next message, enter the following code(you have 2 tries)");
-	do
-	{
-		char user_answer[100] = { 0 };
-		char* captcha_str = NULL;
-		int gen_code_counter = 0;
-
-		do
-		{
-			captcha_str = get_captcha_code();
-			++gen_code_counter;
-
-			if ( !captcha_str )
-			{
-				if ( gen_code_counter >= gen_code_tries )
-				{
-					fprintf(stderr, "%s", "\nUnable to create code: \"code\" is NULL pointer!\n");
-					client_close_connection(peer_sock);
-				}
-			}
-			else
-				break;
-		}
-		while ( gen_code_counter < gen_code_tries );
-		printf("\nYour code: %s\n", captcha_str);
-
-
-		int len = input(user_answer, 100);
-		if ( len < 1 )
-		{
-			printf("\n%s\n", "Input length is empty!");
-			free(captcha_str);
-			client_close_connection(peer_sock);
-		}
-		user_answer[len-1] = '\0';
-
-
-		if ( strcmp(user_answer, captcha_str) == 0 )
-		{
-			printf("\n%s\n", "You can continue messaging");
-			free(captcha_str);
-			return;
-		}
-
-		free(captcha_str);
-		number_tries--;
-
-		if ( number_tries < 1 )
-		{
-			printf("\n%s\n", "You have failed spam-checking. Goodbye.");
-			client_close_connection(peer_sock);
-		}
-		printf("\nWrong code! Try again. You have %d tries.\n", number_tries);
-	}
-	while ( number_tries > 0 );
 }
 
 
@@ -144,6 +80,7 @@ int main(int argc, char** argv)
 			continue;
 		}
 
+
 		if ( FD_ISSET(peer_sock, &readfds) )
 		{
 			char* response_tokens[MAX_RESPONSE_ARGS_NUM];
@@ -158,7 +95,7 @@ int main(int argc, char** argv)
 			if ( bytes_received <= 1 )
 			{
 				fprintf(stderr, "\nConnection closed by server.\n");
-				break;
+				client_close_connection(peer_sock);
 			}
 
 			for ( int i = 0; i < bytes_received; i++ )
@@ -170,6 +107,8 @@ int main(int argc, char** argv)
 				}
 			}
 
+			restrict_message_length(read_buf, 1000);
+
 			char* istr = strtok(read_buf, "|");
 			int i = 0;
 			while ( istr )
@@ -180,19 +119,12 @@ int main(int argc, char** argv)
 			}
 			int response_tokens_size = i;
 
-
-			char current_time[MAX_TIME_STR_SIZE];
-			get_time_str(current_time, MAX_TIME_STR_SIZE);
-
-			if ( authorized )
-				printf("<<< [%s] %s (%s) => %s\n\n", current_time, response_tokens[0], response_tokens[1], response_tokens[2]);
-
-
 			if ( !check_server_response(peer_sock, response_tokens, response_tokens_size, &authorized) )
 			{
 				client_close_connection(peer_sock);
 			}
 		}
+
 
 		if ( authorized && FD_ISSET(0, &readfds) )
 		{
@@ -219,7 +151,7 @@ int main(int argc, char** argv)
 			if ( exit_flag )
 				client_close_connection(peer_sock);
 
-			int sent_bytes = restrict_message_length(send_buf);
+			int sent_bytes = restrict_message_length(send_buf, MAX_MESSAGE_LENGTH);
 
 
 

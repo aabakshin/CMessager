@@ -63,7 +63,8 @@ const char* server_codes_list[SERVER_CODES_COUNT] = {
 									"*USER_LEFT_CHAT",
 									"*USER_AUTHORIZED",
 									"*WHOIH_COMMAND_SUCCESS",
-									"*INTERNAL_ERROR"
+									"*INTERNAL_ERROR",
+									"*SIMPLE_MESSAGE_RECEIVED"
 								};
 
 const char* subcommands_codes_list[SUBCOMMANDS_CODES_COUNT] =

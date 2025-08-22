@@ -39,8 +39,9 @@ int client_init(const char* address, const char* port);
 void client_close_connection(int peer_sock);
 
 
-int restrict_message_length(char* read);
+int restrict_message_length(char* read, int new_length);
 void delete_extra_spaces(char* read, int read_size);
 char* get_captcha_code(void);
+void spam_module_process(int peer_sock);
 
 #endif

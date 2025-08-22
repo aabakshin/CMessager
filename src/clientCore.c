@@ -26,6 +26,69 @@ extern const char* server_codes_list[SERVER_CODES_COUNT];
 extern const char* subcommands_codes_list[SUBCOMMANDS_CODES_COUNT];
 
 
+void spam_module_process(int peer_sock)
+{
+	int number_tries = ANTISPAM_MODULE_TRIES_NUMBER;
+	int gen_code_tries = 3;
+
+
+	printf("\n%s\n", "Before send next message, enter the following code(you have 2 tries)");
+	do
+	{
+		char user_answer[100] = { 0 };
+		char* captcha_str = NULL;
+		int gen_code_counter = 0;
+
+		do
+		{
+			captcha_str = get_captcha_code();
+			++gen_code_counter;
+
+			if ( !captcha_str )
+			{
+				if ( gen_code_counter >= gen_code_tries )
+				{
+					fprintf(stderr, "%s", "\nUnable to create code: \"code\" is NULL pointer!\n");
+					client_close_connection(peer_sock);
+				}
+			}
+			else
+				break;
+		}
+		while ( gen_code_counter < gen_code_tries );
+		printf("\nYour code: %s\n", captcha_str);
+
+
+		int len = input(user_answer, 100);
+		if ( len < 1 )
+		{
+			printf("\n%s\n", "Input length is empty!");
+			free(captcha_str);
+			client_close_connection(peer_sock);
+		}
+		user_answer[len-1] = '\0';
+
+
+		if ( strcmp(user_answer, captcha_str) == 0 )
+		{
+			printf("\n%s\n", "You can continue messaging");
+			free(captcha_str);
+			return;
+		}
+
+		free(captcha_str);
+		number_tries--;
+
+		if ( number_tries < 1 )
+		{
+			printf("\n%s\n", "You have failed spam-checking. Goodbye.");
+			client_close_connection(peer_sock);
+		}
+		printf("\nWrong code! Try again. You have %d tries.\n", number_tries);
+	}
+	while ( number_tries > 0 );
+}
+
 char* get_captcha_code(void)
 {
 	char cur_time[CURRENT_TIME_SIZE];
@@ -46,15 +109,15 @@ char* get_captcha_code(void)
 	return buf;
 }
 
-int restrict_message_length(char* read)
+int restrict_message_length(char* read, int new_length)
 {
 	int length = strlen(read);
 
-	if ( length > MAX_MESSAGE_LENGTH )
+	if ( length > new_length )
 	{
-		read[MAX_MESSAGE_LENGTH] = '\0';
+		read[new_length] = '\0';
 
-		return MAX_MESSAGE_LENGTH;
+		return new_length;
 	}
 
 	return length;
@@ -784,6 +847,13 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 
 		*authorized = 1;
 		return 1;
+	}
+	else if ( strcmp(response_tokens[0], server_codes_list[SIMPLE_MESSAGE_RECEIVED_CODE]) == 0 )
+	{
+		char current_time[MAX_TIME_STR_SIZE];
+		get_time_str(current_time, MAX_TIME_STR_SIZE);
+
+		printf("<<< [%s] %s (%s) => %s\n\n", current_time, response_tokens[1], response_tokens[2], response_tokens[3]);
 	}
 
 	return 0;

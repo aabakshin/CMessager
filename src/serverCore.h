@@ -137,6 +137,7 @@ typedef struct
 void session_send_string(ClientSession *sess, const char *str);
 
 
+/* Database interface */
 int request_to_db(Server* serv_ptr, char* response, int response_size, const char** query_strings);
 int get_field_from_db(Server* serv_ptr, char* field, const char* search_key, int field_code);
 
