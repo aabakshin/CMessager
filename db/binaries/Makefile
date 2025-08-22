@@ -22,3 +22,4 @@ debug: db_server
 
 clean:
 	rm -rf $(LIB_PATH)/Config.o $(LIB_PATH)/serverDatabase.o ../$(LIB_PATH)/Commons.o ../$(LIB_PATH)/DateTime.o $(LIB_PATH)/SessionList.o $(LIB_PATH)/DatabaseMsgHandlers.o $(OUTPUT_NAME)
+	rm usersdata.dat users_sessions.dat

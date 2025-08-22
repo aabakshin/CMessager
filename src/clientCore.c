@@ -13,7 +13,7 @@ enum
 {
 	HAS_ACCOUNT_VALUE_LENGTH			=			   3,
 	VALID_SYMBOLS_NUM					=			  62,
-	MAX_TOKENS_NUM						=			 341,	/* если BUFSIZE = 1024 */
+	MAX_TOKENS_NUM						=			 341	/* если BUFSIZE = 1024 */
 };
 
 
@@ -249,7 +249,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return -1;
+			return 0;
 
 		return 1;
 	}
@@ -263,7 +263,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return -1;
+			return 0;
 
 		return 1;
 	}
@@ -277,7 +277,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return -1;
+			return 0;
 
 		return 1;
 	}
@@ -291,7 +291,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return -1;
+			return 0;
 
 		return 1;
 	}
@@ -305,7 +305,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return -1;
+			return 0;
 
 		return 1;
 	}
@@ -319,7 +319,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return -1;
+			return 0;
 
 		return 1;
 	}
@@ -333,7 +333,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return -1;
+			return 0;
 
 		return 1;
 	}
@@ -347,7 +347,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return -1;
+			return 0;
 
 		return 1;
 	}
@@ -361,7 +361,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return -1;
+			return 0;
 
 		return 1;
 	}
@@ -375,7 +375,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return -1;
+			return 0;
 
 		return 1;
 	}
@@ -389,7 +389,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			box_messages_size++;
 
 		if ( !send_answer(peer_sock, box_messages, box_messages_size, max_read_chars) )
-			return -1;
+			return 0;
 
 		return 1;
 	}
@@ -550,7 +550,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			if ( !view_record_success_result(response_tokens, DEBUG_RECORD_FIELDS_NUM, 1) )
 			{
 				printf("[%s] %s: An error has occured while allocating memory to string buffers!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-				return -1;
+				return 0;
 			}
 		}
 		else if ( strcmp(response_tokens[1], "record") == 0 )
@@ -558,7 +558,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			if ( !view_record_success_result(response_tokens, USER_RECORD_FIELDS_NUM, 0) )
 			{
 				printf("[%s] %s: An error has occured while allocating memory to string buffers!\n", get_time_str(cur_time, CURRENT_TIME_SIZE), ERROR_MESSAGE_TYPE);
-				return -1;
+				return 0;
 			}
 		}
 
@@ -631,7 +631,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 			printf("%s", "\n                            ");
 			printf("%s", "Unable extract field from response string properly!\n");
 
-			return -1;
+			return 0;
 		}
 
 		int i = 2;
@@ -766,7 +766,7 @@ int check_server_response(int peer_sock, char** response_tokens, int response_to
 		printf("%s", "\n                            ");
 		printf("%s", "An internal error has occured on server. Try later.\n");
 
-		return -1;
+		return 0;
 	}
 	else if ( strcmp(response_tokens[0], server_codes_list[SUCCESSFULLY_AUTHORIZED_CODE]) == 0 )
 	{

@@ -568,21 +568,21 @@ int db_get_record_index(FILE* usr_fd, const char* search_key)
 
 	if ( search_key == NULL )
 	{
-		fprintf(stderr, "[%s] %s In function \"db_get_record_index_by_name\" an internal error has occured. \"nickname\" param is NULL\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s In function \"db_get_record_index\" an internal error has occured. \"search_key\" param is NULL\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
 
 	int records_size = db_userinfo_table_get_size(usr_fd);
 	if ( records_size < 1 )
 	{
-		fprintf(stderr, "[%s] %s An internal error occured in \"get_record_index_by_name\" while attempting to get \"record_size\" param. It's 0\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s An internal error occured in \"db_get_record_index\". \"record_size\" param has value below zero.\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
 
 	DBUsersInformation* record = malloc( sizeof(DBUsersInformation) );
 	if ( !record )
 	{
-		fprintf(stderr, "[%s] %s In function \"get_record_index_by_name\" memory error with \"record\"\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
+		fprintf(stderr, "[%s] %s In function \"db_get_record_index\" unable to allocate memory to \"record\".\n", get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE);
 		return -1;
 	}
 
@@ -624,8 +624,8 @@ int db_get_record_index(FILE* usr_fd, const char* search_key)
 
 	if ( i == records_size )
 	{
-		fprintf(stderr, "[%s] %s In function \"get_record_index_by_name\" unable to find record with search key \"%s\" in the table!\n",
-				get_time_str(cur_time, MAX_TIME_STR_SIZE), ERROR_MESSAGE_TYPE, search_key);
+		fprintf(stderr, "[%s] %s In function \"get_record_index\" unable to find record with name \"%s\" in the table!\n",
+				get_time_str(cur_time, MAX_TIME_STR_SIZE), WARN_MESSAGE_TYPE, search_key);
 		return -1;
 	}
 

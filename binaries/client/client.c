@@ -96,7 +96,8 @@ int main(int argc, char** argv)
 	time_t start_time = 0;
 	time_t total_time = ANTISPAM_MODULE_TOTAL_TIME_MS;
 
-	printf("\033c");
+
+	printf("\033c");     /* work on VT100 terminal series only */
 
 	if ( argc != 3 )
 	{
@@ -111,13 +112,9 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	printf("\033c");	/* work on VT100 terminal series only */
-
-	long long timestamps[2] = { 0 };
-	long long interval;
-	int x = 0;
 
 	srand(time(0));
+
 
 	while ( 1 )
 	{
@@ -150,18 +147,13 @@ int main(int argc, char** argv)
 		if ( FD_ISSET(peer_sock, &readfds) )
 		{
 			char* response_tokens[MAX_RESPONSE_ARGS_NUM];
-			int i;
-			for (i = 0; i < MAX_RESPONSE_ARGS_NUM; i++)
+
+			for ( int i = 0; i < MAX_RESPONSE_ARGS_NUM; i++ )
 				response_tokens[i] = NULL;
 
 			char read_buf[BUFSIZE] = { 0 };
 			int bytes_received = recv(peer_sock, read_buf, BUFSIZE, 0);
 			printf("\nReceived %d bytes\n", bytes_received);
-
-
-			char current_time[MAX_TIME_STR_SIZE];
-			get_time_str(current_time, MAX_TIME_STR_SIZE);
-
 
 			if ( bytes_received <= 1 )
 			{
@@ -169,8 +161,7 @@ int main(int argc, char** argv)
 				break;
 			}
 
-
-			for ( i = 0; i < bytes_received; i++ )
+			for ( int i = 0; i < bytes_received; i++ )
 			{
 				if ( read_buf[i] == '\n' )
 				{
@@ -180,7 +171,7 @@ int main(int argc, char** argv)
 			}
 
 			char* istr = strtok(read_buf, "|");
-			i = 0;
+			int i = 0;
 			while ( istr )
 			{
 				response_tokens[i] = istr;
@@ -189,17 +180,18 @@ int main(int argc, char** argv)
 			}
 			int response_tokens_size = i;
 
-			int response_answer = -1;
-			if ( (response_answer = check_server_response(peer_sock, response_tokens, response_tokens_size, &authorized)) )
-			{
-				if ( response_answer == -1 )
-					break;
 
-				continue;
-			}
+			char current_time[MAX_TIME_STR_SIZE];
+			get_time_str(current_time, MAX_TIME_STR_SIZE);
 
 			if ( authorized )
 				printf("<<< [%s] %s (%s) => %s\n\n", current_time, response_tokens[0], response_tokens[1], response_tokens[2]);
+
+
+			if ( !check_server_response(peer_sock, response_tokens, response_tokens_size, &authorized) )
+			{
+				client_close_connection(peer_sock);
+			}
 		}
 
 		if ( authorized && FD_ISSET(0, &readfds) )
@@ -232,6 +224,10 @@ int main(int argc, char** argv)
 
 
 			/*								анти-спам модуль								*/
+
+			long long timestamps[2] = { 0 };
+			long long interval;
+			int x = 0;
 
 			if ( !start_signal )
 			{
